@@ -193,6 +193,48 @@ Signals are in {-1, 0, +1}. Structural typing (duck-typing compatible).
 
 See `docs/backtesting.md` for full documentation.
 
+## Strategy Generator
+
+The strategy generator (`src/quant_engine/backtest/generator.py`) produces parameterized trading strategies for overfitting experiments.
+
+### Architecture
+
+| Component | Purpose |
+|-----------|---------|
+| `StrategySpec` | Serializable specification (family, params, seed, ID) |
+| `StrategyFamily` | ABC defining parameter space and strategy construction |
+| `StrategyGenerator` | Deterministic generation from master seed |
+| `ParameterSpace` | Parameter bounds and validation |
+
+### Strategy Families
+
+| Family | Parameters | Signal Logic |
+|--------|-----------|-------------|
+| `random_threshold` | threshold (float) | Return vs threshold |
+| `random_sma` | fast_window, slow_window (int) | SMA crossover |
+| `random_momentum` | lookback (int) | Price change over lookback |
+| `random_mean_reversion` | lookback (int), threshold (float) | Deviation from SMA |
+
+### Key Properties
+
+- **Deterministic:** Same seed + same config = same strategies
+- **Independent of data:** Generator never accesses PriceData or BacktestResult
+- **Serializable:** StrategySpec supports JSON roundtrip
+- **Identifiable:** Each strategy has a stable SHA-256-derived ID
+- **Inspectable:** All parameters and generation metadata exposed
+
+### RNG Design
+
+```
+master_seed → hash(master_seed, index) → per-strategy seed → per-strategy RNG
+```
+
+### Constraint
+
+Generator does NOT run backtests. Generation and evaluation are strictly separated.
+
+See `docs/strategy_generation.md` for full documentation.
+
 ## Security Principles
 
 - No API keys in code
