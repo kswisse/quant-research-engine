@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Data (local, not committed)
+data/*.parquet
+data/*.csv
+data/*.json
+data/*.db
+!data/.gitkeep
+
+# Environment
+.env
+
+# OS
+.DS_Store
+Thumbs.db
