@@ -7,19 +7,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
-
-class Strategy(BaseModel):
-    """A trading strategy definition.
-
-    In Phase 0, strategies are defined by a name and parameters.
-    Actual strategy logic will be added in the implementation phase.
-    """
-
-    model_config = {"frozen": True}
-
-    name: str
-    parameters: dict[str, float | int | str | bool] = Field(default_factory=dict)
-    index: int = 0  # position in the trial sequence
+from quant_engine.statistics.types import StrategyStatistics
 
 
 class BacktestResult(BaseModel):
@@ -27,16 +15,35 @@ class BacktestResult(BaseModel):
 
     This captures what the strategy "achieved" — which may be
     overfit when many strategies are tested.
+
+    Fields match StrategyStatistics to simplify the bridge between
+    backtesting and statistical evaluation.
     """
 
     model_config = {"frozen": True}
 
-    strategy: Strategy
+    strategy_name: str
+    strategy_parameters: dict[str, float | int | str | bool] = Field(
+        default_factory=dict
+    )
+    strategy_index: int = 0
     sharpe_ratio: float
     n_observations: int
     skewness: float
     kurtosis: float
-    is_selected: bool = False  # was this the best-performing strategy?
+    total_return: float
+    annualized_return: float | None = None
+    max_drawdown: float | None = None
+    is_selected: bool = False
+
+    def to_statistics(self) -> StrategyStatistics:
+        """Convert to StrategyStatistics for statistical evaluation."""
+        return StrategyStatistics(
+            sharpe_ratio=self.sharpe_ratio,
+            skewness=self.skewness,
+            kurtosis=self.kurtosis,
+            number_of_observations=self.n_observations,
+        )
 
 
 class OverfittingDiagnosis(BaseModel):
@@ -55,4 +62,4 @@ class OverfittingDiagnosis(BaseModel):
     skewness: float
     kurtosis: float
     n_observations: int
-    is_overfit: bool  # deflated_sharpe < 0 or probability_of_overfitting > threshold
+    is_overfit: bool

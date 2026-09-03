@@ -144,6 +144,55 @@ The statistics module (`src/quant_engine/statistics/`) provides the mathematical
 
 See `docs/statistics.md` for full mathematical documentation.
 
+## Backtest Engine
+
+The backtest module (`src/quant_engine/backtest/`) provides a minimal vectorized backtest engine for strategy evaluation.
+
+### Architecture
+
+| Module | Purpose |
+|--------|---------|
+| `data.py` | `PriceData` — immutable price sequence with validation |
+| `strategy.py` | `Strategy` Protocol — structural typing for strategies |
+| `engine.py` | `run_backtest()` — core engine with temporal enforcement |
+| `strategies.py` | Built-in strategies: BuyAndHold, AlwaysFlat, AlwaysShort, SMACrossover |
+| `types.py` | `BacktestResult`, `OverfittingDiagnosis` — Pydantic result models |
+
+### Temporal Convention (Critical)
+
+```
+signal[t] → position[t] → return[t+1]
+```
+
+- `signal[t]` uses information through `prices[t]` only.
+- `position[t] = signal[t]`, active during period `t+1`.
+- `strategy_return[t] = position[t] * asset_return[t]`.
+
+The engine shifts signals by 1 period to enforce this. Strategies cannot introduce look-ahead bias by construction.
+
+### Strategy Protocol
+
+```python
+class Strategy(Protocol):
+    name: str
+    def generate_signal(self, data: PriceData) -> np.ndarray: ...
+```
+
+Signals are in {-1, 0, +1}. Structural typing (duck-typing compatible).
+
+### Key Constraints
+
+- Close prices only (Phase 0)
+- Zero transaction costs
+- No fractional sizing
+- Minimum 2 price observations
+
+### Integration with Statistics
+
+`BacktestResult.to_statistics()` converts to `StrategyStatistics` for PSR/DSR evaluation.
+
+See `docs/backtesting.md` for full documentation.
+
 ## Security Principles
 
 - No API keys in code

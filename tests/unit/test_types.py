@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from quant_engine.backtest.types import OverfittingDiagnosis, Strategy
+from quant_engine.backtest.types import OverfittingDiagnosis, BacktestResult
 from quant_engine.statistics.types import (
     ExperimentConfig,
     ReturnSeries,
@@ -59,16 +59,30 @@ class TestExperimentConfig:
             ExperimentConfig(name="test", seed=42, significance_level=0.0)
 
 
-class TestStrategy:
+class TestBacktestResult:
     def test_valid_creation(self):
-        s = Strategy(name="momentum", parameters={"lookback": 20})
-        assert s.name == "momentum"
-        assert s.index == 0
+        result = BacktestResult(
+            strategy_name="momentum",
+            sharpe_ratio=1.5,
+            n_observations=252,
+            skewness=0.0,
+            kurtosis=3.0,
+            total_return=0.15,
+        )
+        assert result.strategy_name == "momentum"
+        assert result.strategy_index == 0
 
     def test_frozen(self):
-        s = Strategy(name="test")
+        result = BacktestResult(
+            strategy_name="test",
+            sharpe_ratio=1.0,
+            n_observations=100,
+            skewness=0.0,
+            kurtosis=3.0,
+            total_return=0.1,
+        )
         with pytest.raises(ValidationError):
-            s.name = "other"
+            result.strategy_name = "other"
 
 
 class TestOverfittingDiagnosis:
