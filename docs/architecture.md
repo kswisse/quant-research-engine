@@ -235,6 +235,46 @@ Generator does NOT run backtests. Generation and evaluation are strictly separat
 
 See `docs/strategy_generation.md` for full documentation.
 
+## Backtest Overfitting Analysis
+
+The overfitting module (`src/quant_engine/overfitting/`) quantifies the statistical danger of selecting the best strategy from many tested strategies.
+
+### Components
+
+| Module | Purpose |
+|--------|---------|
+| `results.py` | `OverfittingAnalysisResult` — Pydantic model with complete analysis output |
+| `analysis.py` | `analyze_backtest_overfitting()` — applies DSR to ExperimentResult |
+
+### Statistical Framework
+
+| Metric | Purpose |
+|--------|---------|
+| **Expected Max Sharpe** | Baseline: best SR from N random strategies under zero skill |
+| **DSR** | Probability that the best strategy's true SR exceeds the baseline |
+
+### Key Design Decisions
+
+1. **Consumes ExperimentResult** — No strategy regeneration or backtest reruns
+2. **Reuses existing primitives** — `expected_max_sharpe()`, `dsr_from_stats()` from statistics module
+3. **Conservative independence assumption** — Uses nominal trial count N despite correlated strategies
+4. **No strategy selection** — Reports on the experiment; does not choose strategies
+5. **No PBO/CSCV** — Deferred to future phases
+
+### Integration Flow
+
+```
+ExperimentRunner.run()
+       ↓
+ExperimentResult
+       ↓
+analyze_backtest_overfitting()
+       ↓
+OverfittingAnalysisResult
+```
+
+See `docs/overfitting.md` for full documentation.
+
 ## Security Principles
 
 - No API keys in code
