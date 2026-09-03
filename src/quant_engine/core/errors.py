@@ -19,3 +19,11 @@ class DataError(QuantEngineError):
 
 class StatisticalError(QuantEngineError):
     """Raised when a statistical computation fails or produces invalid results."""
+
+
+class InsufficientDataError(StatisticalError):
+    """Raised when a statistical computation requires more data points than provided."""
+
+
+class NumericalInstabilityError(StatisticalError):
+    """Raised when a computation produces numerically unstable or unreliable results."""

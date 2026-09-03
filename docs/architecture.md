@@ -107,6 +107,43 @@ Research Output (ExperimentResult)
 Persistence (Parquet/PostgreSQL)
 ```
 
+## Statistical Engine
+
+The statistics module (`src/quant_engine/statistics/`) provides the mathematical foundation for backtest overfitting detection.
+
+### Implemented Metrics
+
+| Metric | Module | Purpose |
+|--------|--------|---------|
+| **Sharpe Ratio** | `sharpe.py` | Risk-adjusted return measure |
+| **PSR** | `psr.py` | Probability that true SR > benchmark |
+| **DSR** | `dsr.py` | Sharpe corrected for selection bias |
+| **Expected Max SR** | `dsr.py` | Expected best SR from N trials under null |
+| **Standard Error** | `psr.py` | Lo (2002) correction for non-normality |
+
+### Conventions
+
+- **Kurtosis:** Regular kurtosis (normal = 3.0), NOT excess kurtosis.
+- **Std denominator:** T-1 (Bessel's correction, sample std).
+- **Annualization:** Explicit `periods_per_year` parameter only.
+- **Risk-free rate:** Default 0.0 (excess returns = raw returns).
+- **Mathematical notation:** T = sample size, N = trial count.
+
+### References
+
+- Bailey, D.H. & López de Prado, M. (2014). "The Deflated Sharpe Ratio." *Journal of Portfolio Management*, 40(5), 94-107.
+- Bailey, D.H. & López de Prado, M. (2012). "The Sharpe Ratio Efficient Frontier." *Journal of Risk*, 15(2), 3-44.
+- Lo, A. (2002). "The Statistics of Sharpe Ratios." *Financial Analysts Journal*, 58(4), 36-52.
+
+### Known Limitations
+
+- PSR/DSR assume i.i.d. returns.
+- Expected maximum SR is an asymptotic approximation.
+- Trial independence is assumed; correlated trials require adjustment.
+- Does not detect look-ahead or survivorship bias.
+
+See `docs/statistics.md` for full mathematical documentation.
+
 ## Security Principles
 
 - No API keys in code
