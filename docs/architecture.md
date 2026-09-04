@@ -314,6 +314,47 @@ OverfittingStudyResult
 
 See `docs/research/overfitting-study.md` for the methodology and results.
 
+## Market Data Layer
+
+The market data module (`src/quant_engine/market_data/`) provides provider-independent
+canonical data models for quantitative research.
+
+### Architecture
+
+```
+External Providers
+        ↓
+Market Data Adapters (future)
+        ↓
+MarketDataNormalizer
+        ↓
+MarketQuote (canonical)
+        ↓
+validate_quote() / validate_time_order()
+        ↓
+Dataset
+        ↓
+Research / Backtest Systems
+```
+
+### Components
+
+| Module | Purpose |
+|--------|---------|
+| `models.py` | `MarketQuote`, `Dataset` — canonical data models |
+| `errors.py` | `MarketDataError`, `InvalidQuoteError`, etc. |
+| `validation.py` | `validate_quote()`, `validate_time_order()`, `find_duplicates()` |
+| `normalization.py` | `MarketDataNormalizer` Protocol, `ExampleNormalizer` |
+
+### Key Principles
+
+- **Provider independence:** No API schema leaks into research engine
+- **Deterministic identity:** SHA-256 record and dataset IDs
+- **Provenance:** Source vs ingestion timestamps preserved
+- **Validation at boundary:** Invalid data rejected before research use
+
+See `docs/market-data.md` for full documentation.
+
 ## Security Principles
 
 - No API keys in code
