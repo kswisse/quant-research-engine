@@ -275,6 +275,45 @@ OverfittingAnalysisResult
 
 See `docs/overfitting.md` for full documentation.
 
+## Research Study
+
+The research module (`src/quant_engine/research/`) orchestrates existing components into reproducible quantitative demonstrations.
+
+### Architecture
+
+```
+OverfittingStudyConfig
+        ↓
+run_overfitting_study()
+        ↓
+  for each N in strategy_counts:
+        ↓
+    ExperimentRunner.run(ExperimentConfig)
+        ↓
+    ExperimentResult
+        ↓
+    analyze_backtest_overfitting()
+        ↓
+    OverfittingAnalysisResult
+        ↓
+OverfittingStudyResult
+```
+
+### Components
+
+| Module | Purpose |
+|--------|---------|
+| `overfitting_study.py` | `OverfittingStudyConfig`, `OverfittingStudyResult`, `run_overfitting_study()` |
+
+### Design Principles
+
+- **Prefix-based seed policy:** N=10 uses strategies 0..9, N=100 uses 0..99, N=1000 uses 0..999
+- **Same price data:** All experiments use identical synthetic data
+- **Deterministic:** Same config always produces same results
+- **No modification of existing components:** Pure orchestration layer
+
+See `docs/research/overfitting-study.md` for the methodology and results.
+
 ## Security Principles
 
 - No API keys in code
