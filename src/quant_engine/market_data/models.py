@@ -163,9 +163,16 @@ class Dataset(BaseModel):
     def dataset_id(self) -> str:
         """Deterministic dataset identifier.
 
-        Derived from schema_version and ordered record IDs.
+        Derived from schema_version and sorted record IDs.
+        Records are sorted by (source_timestamp, record_id) to ensure
+        the same logical dataset always produces the same ID regardless
+        of insertion order.
         """
-        record_ids = [r.record_id for r in self.records]
+        records_with_id = [(r, r.record_id) for r in self.records]
+        records_with_id.sort(
+            key=lambda x: (x[0].source_timestamp.isoformat(), x[1])
+        )
+        record_ids = [rid for _, rid in records_with_id]
         canonical = json.dumps(
             {
                 "schema_version": self.schema_version,

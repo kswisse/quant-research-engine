@@ -146,12 +146,12 @@ class TestDataset:
         ds2 = Dataset(records=[q1, q2])
         assert ds1.dataset_id == ds2.dataset_id
 
-    def test_dataset_id_changes_with_reorder(self) -> None:
+    def test_dataset_id_same_regardless_of_order(self) -> None:
         q1 = _make_quote(instrument="A")
         q2 = _make_quote(instrument="B")
         ds1 = Dataset(records=[q1, q2])
         ds2 = Dataset(records=[q2, q1])
-        assert ds1.dataset_id != ds2.dataset_id
+        assert ds1.dataset_id == ds2.dataset_id
 
     def test_dataset_id_changes_with_record(self) -> None:
         q1 = _make_quote(instrument="A")
