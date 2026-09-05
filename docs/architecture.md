@@ -322,19 +322,19 @@ canonical data models for quantitative research.
 ### Architecture
 
 ```
-External Providers
-        ↓
-Market Data Adapters (future)
-        ↓
-MarketDataNormalizer
-        ↓
-MarketQuote (canonical)
-        ↓
-validate_quote() / validate_time_order()
-        ↓
-Dataset
-        ↓
-Research / Backtest Systems
+              ┌── Polymarket Adapter
+External ─────┤
+Providers     └── Kalshi Adapter
+                     ↓
+               MarketQuote (canonical)
+                     ↓
+        validate_quote() / validate_time_order()
+                     ↓
+                  Dataset
+                     ↓
+                  Replay
+                     ↓
+           Research / Backtest Systems
 ```
 
 ### Components
@@ -343,8 +343,11 @@ Research / Backtest Systems
 |--------|---------|
 | `models.py` | `MarketQuote`, `Dataset` — canonical data models |
 | `errors.py` | `MarketDataError`, `InvalidQuoteError`, etc. |
-| `validation.py` | `validate_quote()`, `validate_time_order()`, `find_duplicates()` |
-| `normalization.py` | `MarketDataNormalizer` Protocol, `ExampleNormalizer` |
+| `validation.py | `validate_quote()`, `validate_time_order()`, `find_duplicates()` |
+| `normalization.py` | `MarketDataNormalizer` ABC, `ExampleNormalizer` |
+| `providers/polymarket/` | Polymarket CLOB + Gamma API adapter |
+| `providers/kalshi/` | Kalshi Trade API v2 adapter |
+| `datasets/` | Historical dataset persistence and replay |
 
 ### Key Principles
 
