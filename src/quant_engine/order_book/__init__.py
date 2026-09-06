@@ -10,6 +10,9 @@ Public API:
     spread: Top-of-book spread
     cumulative_depth: Cumulative depth for first N levels
     DepthLevel: Cumulative depth result type
+    ExecutionFill: Single fill at a price level
+    ExecutionResult: Result of mechanical order book consumption
+    consume_book: Mechanical execution simulator
 """
 
 from quant_engine.order_book.calculations import (
@@ -18,6 +21,11 @@ from quant_engine.order_book.calculations import (
     best_bid,
     cumulative_depth,
     spread,
+)
+from quant_engine.order_book.execution import (
+    ExecutionFill,
+    ExecutionResult,
+    consume_book,
 )
 from quant_engine.order_book.models import (
     OrderBookLevel,
@@ -28,10 +36,13 @@ from quant_engine.order_book.validation import validate_snapshot
 
 __all__ = [
     "DepthLevel",
+    "ExecutionFill",
+    "ExecutionResult",
     "OrderBookLevel",
     "OrderBookSnapshot",
     "best_ask",
     "best_bid",
+    "consume_book",
     "cumulative_depth",
     "snapshot_id",
     "spread",

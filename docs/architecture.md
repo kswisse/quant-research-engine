@@ -358,6 +358,7 @@ Providers     └── Kalshi Adapter
 | `order_book/models.py` | `OrderBookLevel`, `OrderBookSnapshot` — depth-aware research models |
 | `order_book/validation.py` | `validate_snapshot()` — order book validation |
 | `order_book/calculations.py` | `best_bid()`, `best_ask()`, `spread()`, `cumulative_depth()` |
+| `order_book/execution.py` | `consume_book()`, `ExecutionFill`, `ExecutionResult` — mechanical execution simulator |
 
 ### Key Principles
 

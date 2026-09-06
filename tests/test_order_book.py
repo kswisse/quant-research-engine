@@ -23,10 +23,13 @@ from hypothesis import strategies as st
 
 from quant_engine.order_book import (
     DepthLevel,
+    ExecutionFill,
+    ExecutionResult,
     OrderBookLevel,
     OrderBookSnapshot,
     best_ask,
     best_bid,
+    consume_book,
     cumulative_depth,
     snapshot_id,
     spread,
@@ -753,3 +756,403 @@ class TestPropertyBased:
         snap = _make_snapshot(bids=bids)
         expected = max(price for price, _ in bids)
         assert best_bid(snap) == expected
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 7. EXECUTION TESTS
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+class TestExecutionValidation:
+    """Input validation for consume_book()."""
+
+    def test_zero_requested_size_rejected(self) -> None:
+        """Zero requested_size raises ValueError."""
+        snap = _make_snapshot(asks=[(0.50, 100.0)])
+        with pytest.raises(ValueError, match="requested_size"):
+            consume_book(snap, "buy", 0.0)
+
+    def test_negative_requested_size_rejected(self) -> None:
+        """Negative requested_size raises ValueError."""
+        snap = _make_snapshot(asks=[(0.50, 100.0)])
+        with pytest.raises(ValueError, match="requested_size"):
+            consume_book(snap, "buy", -10.0)
+
+    def test_nan_requested_size_rejected(self) -> None:
+        """NaN requested_size raises ValueError."""
+        snap = _make_snapshot(asks=[(0.50, 100.0)])
+        with pytest.raises(ValueError, match="requested_size"):
+            consume_book(snap, "buy", float("nan"))
+
+    def test_inf_requested_size_rejected(self) -> None:
+        """Infinity requested_size raises ValueError."""
+        snap = _make_snapshot(asks=[(0.50, 100.0)])
+        with pytest.raises(ValueError, match="requested_size"):
+            consume_book(snap, "buy", float("inf"))
+
+    def test_invalid_side_rejected(self) -> None:
+        """Invalid side raises ValueError."""
+        snap = _make_snapshot(asks=[(0.50, 100.0)])
+        with pytest.raises(ValueError, match="side"):
+            consume_book(snap, "invalid", 100.0)  # type: ignore[arg-type]
+
+
+class TestBuyExecution:
+    """BUY order execution (consume asks ascending)."""
+
+    def test_one_level_full_fill(self) -> None:
+        """BUY fills one level completely."""
+        snap = _make_snapshot(asks=[(0.40, 100.0)])
+        result = consume_book(snap, "buy", 50.0)
+
+        assert result.side == "buy"
+        assert result.requested_size == 50.0
+        assert result.filled_size == 50.0
+        assert result.remaining_size == 0.0
+        assert result.total_notional == pytest.approx(20.0)
+        assert result.vwap == pytest.approx(0.40)
+        assert result.fully_filled is True
+        assert len(result.fills) == 1
+        assert result.fills[0].price == 0.40
+        assert result.fills[0].size == 50.0
+
+    def test_one_level_partial_fill(self) -> None:
+        """BUY partially fills one level."""
+        snap = _make_snapshot(asks=[(0.40, 100.0)])
+        result = consume_book(snap, "buy", 150.0)
+
+        assert result.filled_size == 100.0
+        assert result.remaining_size == 50.0
+        assert result.total_notional == pytest.approx(40.0)
+        assert result.vwap == pytest.approx(0.40)
+        assert result.fully_filled is False
+
+    def test_multi_level_full_fill(self) -> None:
+        """BUY fills multiple levels completely."""
+        snap = _make_snapshot(asks=[(0.40, 100.0), (0.41, 100.0), (0.45, 100.0)])
+        result = consume_book(snap, "buy", 250.0)
+
+        assert result.filled_size == 250.0
+        assert result.remaining_size == 0.0
+        assert result.fully_filled is True
+        assert len(result.fills) == 3
+        assert result.fills[0].price == 0.40
+        assert result.fills[1].price == 0.41
+        assert result.fills[2].price == 0.45
+
+    def test_multi_level_partial_fill(self) -> None:
+        """BUY partially fills across multiple levels."""
+        snap = _make_snapshot(asks=[(0.40, 100.0), (0.41, 100.0), (0.45, 100.0)])
+        result = consume_book(snap, "buy", 150.0)
+
+        assert result.filled_size == 150.0
+        assert result.remaining_size == 0.0
+        assert result.fully_filled is True
+        assert len(result.fills) == 2
+        assert result.fills[0].price == 0.40
+        assert result.fills[0].size == 100.0
+        assert result.fills[1].price == 0.41
+        assert result.fills[1].size == 50.0
+
+    def test_insufficient_liquidity(self) -> None:
+        """BUY with insufficient liquidity fills partially."""
+        snap = _make_snapshot(asks=[(0.40, 100.0)])
+        result = consume_book(snap, "buy", 150.0)
+
+        assert result.filled_size == 100.0
+        assert result.remaining_size == 50.0
+        assert result.fully_filled is False
+
+    def test_empty_ask_side(self) -> None:
+        """BUY with empty asks returns unfilled."""
+        snap = _make_snapshot(asks=[])
+        result = consume_book(snap, "buy", 100.0)
+
+        assert result.filled_size == 0.0
+        assert result.remaining_size == 100.0
+        assert result.total_notional == 0.0
+        assert result.vwap is None
+        assert result.fully_filled is False
+        assert len(result.fills) == 0
+
+    def test_execution_priority_ascending(self) -> None:
+        """BUY consumes asks from lowest to highest."""
+        snap = _make_snapshot(asks=[(0.50, 100.0), (0.40, 100.0), (0.45, 100.0)])
+        result = consume_book(snap, "buy", 200.0)
+
+        # After canonicalization: asks are [0.40, 0.45, 0.50]
+        assert result.fills[0].price == 0.40
+        assert result.fills[1].price == 0.45
+
+
+class TestSellExecution:
+    """SELL order execution (consume bids descending)."""
+
+    def test_one_level_full_fill(self) -> None:
+        """SELL fills one level completely."""
+        snap = _make_snapshot(bids=[(0.60, 100.0)])
+        result = consume_book(snap, "sell", 50.0)
+
+        assert result.side == "sell"
+        assert result.requested_size == 50.0
+        assert result.filled_size == 50.0
+        assert result.remaining_size == 0.0
+        assert result.total_notional == pytest.approx(30.0)
+        assert result.vwap == pytest.approx(0.60)
+        assert result.fully_filled is True
+
+    def test_one_level_partial_fill(self) -> None:
+        """SELL partially fills one level."""
+        snap = _make_snapshot(bids=[(0.60, 100.0)])
+        result = consume_book(snap, "sell", 150.0)
+
+        assert result.filled_size == 100.0
+        assert result.remaining_size == 50.0
+        assert result.total_notional == pytest.approx(60.0)
+        assert result.vwap == pytest.approx(0.60)
+        assert result.fully_filled is False
+
+    def test_multi_level_full_fill(self) -> None:
+        """SELL fills multiple levels completely."""
+        snap = _make_snapshot(bids=[(0.60, 100.0), (0.59, 100.0), (0.55, 100.0)])
+        result = consume_book(snap, "sell", 250.0)
+
+        assert result.filled_size == 250.0
+        assert result.remaining_size == 0.0
+        assert result.fully_filled is True
+        assert len(result.fills) == 3
+        assert result.fills[0].price == 0.60
+        assert result.fills[1].price == 0.59
+        assert result.fills[2].price == 0.55
+
+    def test_multi_level_partial_fill(self) -> None:
+        """SELL partially fills across multiple levels."""
+        snap = _make_snapshot(bids=[(0.60, 100.0), (0.59, 100.0), (0.55, 100.0)])
+        result = consume_book(snap, "sell", 150.0)
+
+        assert result.filled_size == 150.0
+        assert result.remaining_size == 0.0
+        assert result.fully_filled is True
+        assert len(result.fills) == 2
+        assert result.fills[0].price == 0.60
+        assert result.fills[0].size == 100.0
+        assert result.fills[1].price == 0.59
+        assert result.fills[1].size == 50.0
+
+    def test_insufficient_liquidity(self) -> None:
+        """SELL with insufficient liquidity fills partially."""
+        snap = _make_snapshot(bids=[(0.60, 100.0)])
+        result = consume_book(snap, "sell", 150.0)
+
+        assert result.filled_size == 100.0
+        assert result.remaining_size == 50.0
+        assert result.fully_filled is False
+
+    def test_empty_bid_side(self) -> None:
+        """SELL with empty bids returns unfilled."""
+        snap = _make_snapshot(bids=[])
+        result = consume_book(snap, "sell", 100.0)
+
+        assert result.filled_size == 0.0
+        assert result.remaining_size == 100.0
+        assert result.total_notional == 0.0
+        assert result.vwap is None
+        assert result.fully_filled is False
+        assert len(result.fills) == 0
+
+    def test_execution_priority_descending(self) -> None:
+        """SELL consumes bids from highest to lowest."""
+        snap = _make_snapshot(bids=[(0.55, 100.0), (0.60, 100.0), (0.50, 100.0)])
+        result = consume_book(snap, "sell", 200.0)
+
+        # After canonicalization: bids are [0.60, 0.55, 0.50]
+        assert result.fills[0].price == 0.60
+        assert result.fills[1].price == 0.55
+
+
+class TestVWAP:
+    """VWAP calculation correctness."""
+
+    def test_vwap_single_level(self) -> None:
+        """VWAP equals fill price for single level."""
+        snap = _make_snapshot(asks=[(0.40, 100.0)])
+        result = consume_book(snap, "buy", 50.0)
+        assert result.vwap == pytest.approx(0.40)
+
+    def test_vwap_multi_level(self) -> None:
+        """VWAP is correctly computed across multiple levels."""
+        snap = _make_snapshot(asks=[(0.40, 100.0), (0.41, 100.0)])
+        result = consume_book(snap, "buy", 150.0)
+
+        # 100 @ 0.40 = 40.00, 50 @ 0.41 = 20.50
+        # total_notional = 60.50
+        # filled_size = 150
+        # VWAP = 60.50 / 150
+        expected_vwap = (100.0 * 0.40 + 50.0 * 0.41) / 150.0
+        assert result.vwap == pytest.approx(expected_vwap)
+
+    def test_vwap_none_when_empty(self) -> None:
+        """VWAP is None when nothing fills."""
+        snap = _make_snapshot(asks=[])
+        result = consume_book(snap, "buy", 100.0)
+        assert result.vwap is None
+
+    def test_vwap_within_price_range(self) -> None:
+        """VWAP lies within the range of executed prices."""
+        snap = _make_snapshot(asks=[(0.40, 100.0), (0.45, 100.0), (0.50, 100.0)])
+        result = consume_book(snap, "buy", 250.0)
+
+        assert result.vwap is not None
+        assert result.vwap >= 0.40
+        assert result.vwap <= 0.50
+
+
+class TestExecutionFillNotional:
+    """ExecutionFill.notional property."""
+
+    def test_notional_property(self) -> None:
+        """notional = price * size."""
+        fill = ExecutionFill(price=0.55, size=100.0)
+        assert fill.notional == pytest.approx(55.0)
+
+    def test_notional_zero_price(self) -> None:
+        """notional = 0 when price = 0."""
+        fill = ExecutionFill(price=0.0, size=100.0)
+        assert fill.notional == 0.0
+
+    def test_notional_zero_size(self) -> None:
+        """notional = 0 when size = 0."""
+        fill = ExecutionFill(price=0.5, size=0.0)
+        assert fill.notional == 0.0
+
+
+class TestExecutionInvariants:
+    """Accounting invariants for all valid results."""
+
+    def test_filled_plus_remaining_equals_requested(self) -> None:
+        """filled_size + remaining_size == requested_size."""
+        snap = _make_snapshot(asks=[(0.40, 100.0), (0.41, 100.0)])
+        result = consume_book(snap, "buy", 150.0)
+        assert result.filled_size + result.remaining_size == pytest.approx(result.requested_size)
+
+    def test_total_notional_equals_sum_of_fills(self) -> None:
+        """total_notional == sum(fill.notional)."""
+        snap = _make_snapshot(asks=[(0.40, 100.0), (0.41, 100.0)])
+        result = consume_book(snap, "buy", 150.0)
+        expected = sum(fill.notional for fill in result.fills)
+        assert result.total_notional == pytest.approx(expected)
+
+    def test_fully_filled_iff_remaining_zero(self) -> None:
+        """fully_filled == (remaining_size == 0)."""
+        snap = _make_snapshot(asks=[(0.40, 100.0)])
+        result = consume_book(snap, "buy", 50.0)
+        assert result.fully_filled is (result.remaining_size == 0.0)
+
+    def test_non_mutation(self) -> None:
+        """consume_book does not modify the source snapshot."""
+        snap = _make_snapshot(
+            asks=[(0.40, 100.0), (0.41, 100.0)],
+            bids=[(0.39, 100.0)],
+        )
+        original_bids = list(snap.bids)
+        original_asks = list(snap.asks)
+
+        consume_book(snap, "buy", 150.0)
+
+        assert list(snap.bids) == original_bids
+        assert list(snap.asks) == original_asks
+
+
+class TestExecutionCrossedBook:
+    """Crossed book handling during execution."""
+
+    def test_crossed_book_buy_consumes_asks(self) -> None:
+        """BUY on crossed book consumes asks mechanically."""
+        snap = _make_snapshot(
+            bids=[(0.60, 100.0)],
+            asks=[(0.50, 100.0)],
+        )
+        result = consume_book(snap, "buy", 50.0)
+
+        assert result.filled_size == 50.0
+        assert result.vwap == pytest.approx(0.50)
+
+    def test_crossed_book_sell_consumes_bids(self) -> None:
+        """SELL on crossed book consumes bids mechanically."""
+        snap = _make_snapshot(
+            bids=[(0.60, 100.0)],
+            asks=[(0.50, 100.0)],
+        )
+        result = consume_book(snap, "sell", 50.0)
+
+        assert result.filled_size == 50.0
+        assert result.vwap == pytest.approx(0.60)
+
+
+class TestExecutionPropertyBased:
+    """Hypothesis-based tests for execution invariants."""
+
+    @given(
+        asks=st.lists(
+            st.tuples(
+                st.floats(min_value=0.01, max_value=0.99, allow_nan=False),
+                st.floats(min_value=1.0, max_value=1000.0, allow_nan=False),
+            ),
+            min_size=1,
+            max_size=10,
+        ),
+        requested=st.floats(min_value=1.0, max_value=5000.0, allow_nan=False),
+    )
+    @settings(max_examples=50)
+    def test_buy_filled_never_exceeds_requested(
+        self, asks: list[tuple[float, float]], requested: float
+    ) -> None:
+        """BUY: filled_size <= requested_size."""
+        snap = _make_snapshot(asks=asks)
+        result = consume_book(snap, "buy", requested)
+        assert result.filled_size <= result.requested_size + 1e-9
+
+    @given(
+        bids=st.lists(
+            st.tuples(
+                st.floats(min_value=0.01, max_value=0.99, allow_nan=False),
+                st.floats(min_value=1.0, max_value=1000.0, allow_nan=False),
+            ),
+            min_size=1,
+            max_size=10,
+        ),
+        requested=st.floats(min_value=1.0, max_value=5000.0, allow_nan=False),
+    )
+    @settings(max_examples=50)
+    def test_sell_filled_never_exceeds_requested(
+        self, bids: list[tuple[float, float]], requested: float
+    ) -> None:
+        """SELL: filled_size <= requested_size."""
+        snap = _make_snapshot(bids=bids)
+        result = consume_book(snap, "sell", requested)
+        assert result.filled_size <= result.requested_size + 1e-9
+
+    @given(
+        asks=st.lists(
+            st.tuples(
+                st.floats(min_value=0.01, max_value=0.99, allow_nan=False),
+                st.floats(min_value=1.0, max_value=1000.0, allow_nan=False),
+            ),
+            min_size=1,
+            max_size=10,
+        ),
+        requested=st.floats(min_value=1.0, max_value=5000.0, allow_nan=False),
+    )
+    @settings(max_examples=50)
+    def test_buy_vwap_in_price_range(
+        self, asks: list[tuple[float, float]], requested: float
+    ) -> None:
+        """BUY: VWAP lies within the range of executed prices."""
+        snap = _make_snapshot(asks=asks)
+        result = consume_book(snap, "buy", requested)
+        if result.fills:
+            min_price = min(f.price for f in result.fills)
+            max_price = max(f.price for f in result.fills)
+            assert result.vwap is not None
+            assert result.vwap >= min_price - 1e-9
+            assert result.vwap <= max_price + 1e-9

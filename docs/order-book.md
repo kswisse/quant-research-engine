@@ -235,18 +235,107 @@ if provider == "polymarket":
 
 Provider-specific conversion belongs in the adapter layer. The model knows only canonical market-data concepts.
 
+## Mechanical Execution Simulator
+
+The `consume_book()` function provides deterministic, provider-independent simulation of consuming displayed liquidity from a static order book.
+
+### How It Works
+
+For a **BUY** order:
+- Consumes asks from lowest to highest price
+- At each level: `filled = min(remaining, level.size)`
+- Tracks per-level fills and total notional
+
+For a **SELL** order:
+- Consumes bids from highest to lowest price
+- Same fill logic as BUY
+
+### ExecutionFill
+
+```python
+@dataclass(frozen=True)
+class ExecutionFill:
+    price: float   # Price at which the fill occurred
+    size: float    # Number of contracts filled
+```
+
+The `notional` property computes `price * size`.
+
+### ExecutionResult
+
+```python
+@dataclass(frozen=True)
+class ExecutionResult:
+    side: Literal["buy", "sell"]
+    requested_size: float      # Original request
+    filled_size: float         # Actually filled
+    remaining_size: float      # Not filled (requested - filled)
+    total_notional: float      # Sum of fill notionals
+    vwap: float | None         # Volume-weighted avg price (None if nothing fills)
+    fills: tuple[ExecutionFill, ...]  # Per-level details
+    fully_filled: bool         # True if completely filled
+```
+
+### VWAP Calculation
+
+```
+VWAP = total_notional / filled_size
+```
+
+VWAP is `None` when `filled_size == 0` (nothing fills).
+
+### Partial Fills
+
+When the book doesn't have enough depth:
+
+```python
+# Book has 100 contracts at 0.40
+# Requesting 150 contracts
+
+result = consume_book(book, "buy", 150.0)
+assert result.filled_size == 100.0
+assert result.remaining_size == 50.0
+assert result.fully_filled is False
+```
+
+### Empty Books
+
+Empty sides return unfilled results:
+
+```python
+# No asks available
+result = consume_book(book, "buy", 100.0)
+assert result.filled_size == 0.0
+assert result.vwap is None
+```
+
+### Crossed Books
+
+Crossed books are consumed mechanically. The simulator does NOT reject or repair them — it simply consumes the displayed liquidity at each price level.
+
+### What This Is NOT
+
+This simulator models consumption of displayed static liquidity. It is NOT:
+
+- A realistic execution/fill-probability model
+- A guarantee of real-world execution prices
+- An accounting for queue position, latency, or adverse selection
+- A fee-inclusive cost model
+
+Future phases will model execution semantics beyond mechanical consumption.
+
 ## Deferred Functionality
 
-The following are explicitly out of scope for Phase 2.0:
+The following are explicitly out of scope for Phase 2.1:
 
 | Concept | Phase |
 |---------|-------|
-| `consume_book` (mechanical VWAP) | 2.1+ |
-| Slippage model | 2.1+ |
-| Fill probability | 2.1+ |
-| YES/NO arbitrage | 2.1+ |
-| Cross-venue matching | 2.1+ |
-| Fee calculation | 2.1+ |
+| Fee calculation | 2.2+ |
+| Slippage model | 2.2+ |
+| Fill probability | 2.2+ |
+| Queue position | 2.2+ |
+| YES/NO arbitrage | 2.2+ |
+| Cross-venue matching | 2.2+ |
 | Latency model | 2.1+ |
 | Kelly sizing | 2.1+ |
 | Real-time streaming | Separate module |
