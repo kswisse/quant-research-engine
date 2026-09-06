@@ -343,15 +343,17 @@ Providers     └── Kalshi Adapter
                     Mechanical Execution
                     (consume_book)
                             ↓
-                    Same-Market Arbitrage
-                    (detect_same_market_arbitrage)
-                            ↓
-                    ArbitrageOpportunity
-                            ↓
-                    Arbitrage Cost Model
-                    (evaluate_arbitrage_costs)
-                            ↓
-                    NetArbitrageResult
+           ┌────────────────┴────────────────┐
+           ↓                                 ↓
+    Same-Market Arbitrage           Cross-Venue Arbitrage
+    (detect_same_market_arbitrage)  (detect_cross_venue_arbitrage)
+           ↓                                 ↓
+    ArbitrageOpportunity            CrossVenueOpportunity
+           ↓                                 ↓
+    Arbitrage Cost Model             Arbitrage Cost Model
+    (evaluate_arbitrage_costs)       (evaluate_cross_venue_costs)
+           ↓                                 ↓
+    NetArbitrageResult               NetCrossVenueResult
 ```
 
 ### Components
@@ -371,7 +373,8 @@ Providers     └── Kalshi Adapter
 | `order_book/execution.py` | `consume_book()`, `ExecutionFill`, `ExecutionResult` — mechanical execution simulator |
 | `arbitrage/models.py` | `ArbitrageOpportunity` — detected same-market arbitrage result |
 | `arbitrage/detection.py` | `detect_same_market_arbitrage()` — YES+NO arbitrage detector |
-| `arbitrage/costs.py` | `ArbitrageCostModel`, `NetArbitrageResult`, `evaluate_arbitrage_costs()` — cost evaluation |
+| `arbitrage/cross_venue.py` | `CrossVenueOpportunity`, `detect_cross_venue_arbitrage()` — cross-venue detector |
+| `arbitrage/costs.py` | `ArbitrageCostModel`, `NetArbitrageResult`, `NetCrossVenueResult` — cost evaluation |
 
 ### Key Principles
 
@@ -385,6 +388,7 @@ See `docs/market-data.md` for canonical data model documentation.
 See `docs/order-book.md` for order book research model documentation.
 See `docs/arbitrage.md` for arbitrage detection documentation.
 See `docs/arbitrage-costs.md` for arbitrage cost evaluation documentation.
+See `docs/cross-venue-arbitrage.md` for cross-venue arbitrage documentation.
 
 ## Security Principles
 

@@ -3,6 +3,8 @@
 Extends Phase 2.2 gross arbitrage detection with explicit execution cost
 modeling and legging/exposure information.
 
+Supports both same-market binary arbitrage and cross-venue arbitrage.
+
 This is a deterministic research calculation — it does NOT model:
 - live trading
 - wallet integration
@@ -11,7 +13,6 @@ This is a deterministic research calculation — it does NOT model:
 - blockchain RPC
 - order submission
 - real-money execution
-- cross-venue arbitrage
 - real-time execution probability prediction
 
 Architecture:
@@ -19,6 +20,11 @@ Architecture:
                            ├→ evaluate_arbitrage_costs()
     ArbitrageCostModel   ─┘            ↓
                                NetArbitrageResult
+
+    CrossVenueOpportunity ─┐
+                            ├→ evaluate_cross_venue_costs()
+    ArbitrageCostModel    ─┘            ↓
+                                NetCrossVenueResult
 """
 
 from __future__ import annotations
@@ -28,6 +34,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from quant_engine.arbitrage.cross_venue import CrossVenueOpportunity
     from quant_engine.arbitrage.models import ArbitrageOpportunity
 
 
@@ -38,22 +45,34 @@ class ArbitrageCostModel:
     Represents caller-supplied assumptions about execution costs.
     All values are non-negative. Fee rates are proportions (e.g., 0.02 = 2%).
 
+    Supports both same-market and cross-venue arbitrage.
+
     Attributes:
         yes_fee_rate: Percentage of YES execution notional (0.0 to 1.0).
         no_fee_rate: Percentage of NO execution notional (0.0 to 1.0).
+        buy_fee_rate: Percentage of buy execution notional for cross-venue (0.0 to 1.0).
+        sell_fee_rate: Percentage of sell execution notional for cross-venue (0.0 to 1.0).
         fixed_cost: Generic fixed operational/transaction cost.
         settlement_cost: Optional explicit settlement cost.
+        transfer_cost: Cross-venue asset transfer cost (one-time per opportunity).
     """
 
     yes_fee_rate: float = 0.0
     no_fee_rate: float = 0.0
+    buy_fee_rate: float = 0.0
+    sell_fee_rate: float = 0.0
     fixed_cost: float = 0.0
     settlement_cost: float = 0.0
+    transfer_cost: float = 0.0
 
     def __post_init__(self) -> None:
         """Validate cost model parameters."""
         # Check for NaN and infinity
-        for field_name in ("yes_fee_rate", "no_fee_rate", "fixed_cost", "settlement_cost"):
+        for field_name in (
+            "yes_fee_rate", "no_fee_rate",
+            "buy_fee_rate", "sell_fee_rate",
+            "fixed_cost", "settlement_cost", "transfer_cost",
+        ):
             value = getattr(self, field_name)
             if math.isnan(value) or math.isinf(value):
                 raise ValueError(f"{field_name} must be finite, got {value}")
@@ -63,16 +82,26 @@ class ArbitrageCostModel:
             raise ValueError(f"yes_fee_rate must be >= 0, got {self.yes_fee_rate}")
         if self.no_fee_rate < 0:
             raise ValueError(f"no_fee_rate must be >= 0, got {self.no_fee_rate}")
+        if self.buy_fee_rate < 0:
+            raise ValueError(f"buy_fee_rate must be >= 0, got {self.buy_fee_rate}")
+        if self.sell_fee_rate < 0:
+            raise ValueError(f"sell_fee_rate must be >= 0, got {self.sell_fee_rate}")
         if self.fixed_cost < 0:
             raise ValueError(f"fixed_cost must be >= 0, got {self.fixed_cost}")
         if self.settlement_cost < 0:
             raise ValueError(f"settlement_cost must be >= 0, got {self.settlement_cost}")
+        if self.transfer_cost < 0:
+            raise ValueError(f"transfer_cost must be >= 0, got {self.transfer_cost}")
 
         # Check fee rates are <= 1.0 (100%)
         if self.yes_fee_rate > 1.0:
             raise ValueError(f"yes_fee_rate must be <= 1.0, got {self.yes_fee_rate}")
         if self.no_fee_rate > 1.0:
             raise ValueError(f"no_fee_rate must be <= 1.0, got {self.no_fee_rate}")
+        if self.buy_fee_rate > 1.0:
+            raise ValueError(f"buy_fee_rate must be <= 1.0, got {self.buy_fee_rate}")
+        if self.sell_fee_rate > 1.0:
+            raise ValueError(f"sell_fee_rate must be <= 1.0, got {self.sell_fee_rate}")
 
 
 @dataclass(frozen=True)
@@ -215,4 +244,157 @@ def evaluate_arbitrage_costs(
         net_return=net_return,
         fully_paired=fully_paired,
         pairing_ratio=pairing_ratio,
+    )
+
+
+@dataclass(frozen=True)
+class NetCrossVenueResult:
+    """Result of evaluating cross-venue arbitrage under execution costs.
+
+    Preserves the distinction between gross execution, fees, other costs,
+    and net result. Includes legging/exposure information.
+
+    Attributes:
+        outcome_label: Human-readable outcome description.
+        buy_venue: Provider identifier for the buy side.
+        sell_venue: Provider identifier for the sell side.
+        buy_instrument_id: Provider's instrument identifier on buy venue.
+        sell_instrument_id: Provider's instrument identifier on sell venue.
+        requested_size: Original requested number of contracts.
+        buy_filled: Number of contracts actually bought.
+        sell_filled: Number of contracts actually sold.
+        executable_size: Number of contracts in paired trades.
+        unpaired_buy: Contracts bought but not part of a paired trade.
+        unpaired_sell: Contracts sold but not part of a paired trade.
+        gross_cost: Total buy-side execution cost.
+        buy_fee: Fee charged on buy execution.
+        sell_fee: Fee charged on sell execution.
+        fixed_cost: Fixed operational cost.
+        settlement_cost: Settlement cost.
+        transfer_cost: Cross-venue asset transfer cost.
+        total_cost: gross_cost + buy_fee + sell_fee + fixed + settlement + transfer.
+        gross_proceeds: Total sell-side execution proceeds.
+        gross_spread: gross_proceeds - gross_cost.
+        net_spread: gross_proceeds - total_cost.
+        gross_return: gross_spread / gross_cost. None if gross_cost == 0.
+        net_return: net_spread / total_cost. None if total_cost == 0.
+        fully_executable: True if buy_filled == sell_filled.
+        execution_ratio: executable_size / requested_size. None if requested_size == 0.
+    """
+
+    outcome_label: str
+    buy_venue: str
+    sell_venue: str
+    buy_instrument_id: str
+    sell_instrument_id: str
+    requested_size: float
+    buy_filled: float
+    sell_filled: float
+    executable_size: float
+    unpaired_buy: float
+    unpaired_sell: float
+    gross_cost: float
+    buy_fee: float
+    sell_fee: float
+    fixed_cost: float
+    settlement_cost: float
+    transfer_cost: float
+    total_cost: float
+    gross_proceeds: float
+    gross_spread: float
+    net_spread: float
+    gross_return: float | None
+    net_return: float | None
+    fully_executable: bool
+    execution_ratio: float | None
+
+
+def evaluate_cross_venue_costs(
+    opportunity: CrossVenueOpportunity,
+    cost_model: ArbitrageCostModel,
+) -> NetCrossVenueResult:
+    """Evaluate cross-venue arbitrage opportunity under execution costs.
+
+    Takes a detected cross-venue arbitrage opportunity and applies explicit
+    cost assumptions to produce a net economic result with exposure information.
+
+    The function operates on actual execution notionals from the opportunity
+    (depth-aware), not quoted prices.
+
+    Args:
+        opportunity: Detected cross-venue arbitrage opportunity.
+        cost_model: Caller-supplied cost assumptions.
+
+    Returns:
+        NetCrossVenueResult with full cost and exposure details.
+    """
+    # Extract execution information
+    buy_filled = opportunity.buy_execution.filled_size
+    sell_filled = opportunity.sell_execution.filled_size
+    gross_cost = opportunity.buy_execution.total_notional
+    gross_proceeds = opportunity.sell_execution.total_notional
+
+    # Paired quantity is the minimum of both fills
+    executable_size = min(buy_filled, sell_filled)
+
+    # Unpaired exposure
+    unpaired_buy = buy_filled - executable_size
+    unpaired_sell = sell_filled - executable_size
+
+    # Calculate fees based on actual execution notionals
+    buy_fee = gross_cost * cost_model.buy_fee_rate if cost_model.buy_fee_rate > 0 else 0.0
+    sell_fee = gross_proceeds * cost_model.sell_fee_rate if cost_model.sell_fee_rate > 0 else 0.0
+
+    # Total cost including all fees
+    total_cost = (
+        gross_cost
+        + buy_fee
+        + sell_fee
+        + cost_model.fixed_cost
+        + cost_model.settlement_cost
+        + cost_model.transfer_cost
+    )
+
+    # Spread calculations
+    gross_spread = gross_proceeds - gross_cost
+    net_spread = gross_proceeds - total_cost
+
+    # Return calculations (None for zero denominators)
+    gross_return = gross_spread / gross_cost if gross_cost > 0 else None
+    net_return = net_spread / total_cost if total_cost > 0 else None
+
+    # Execution metrics
+    fully_executable = buy_filled == sell_filled
+    execution_ratio = (
+        executable_size / opportunity.requested_size
+        if opportunity.requested_size > 0
+        else None
+    )
+
+    return NetCrossVenueResult(
+        outcome_label=opportunity.outcome_label,
+        buy_venue=opportunity.buy_venue,
+        sell_venue=opportunity.sell_venue,
+        buy_instrument_id=opportunity.buy_instrument_id,
+        sell_instrument_id=opportunity.sell_instrument_id,
+        requested_size=opportunity.requested_size,
+        buy_filled=buy_filled,
+        sell_filled=sell_filled,
+        executable_size=executable_size,
+        unpaired_buy=unpaired_buy,
+        unpaired_sell=unpaired_sell,
+        gross_cost=gross_cost,
+        buy_fee=buy_fee,
+        sell_fee=sell_fee,
+        fixed_cost=cost_model.fixed_cost,
+        settlement_cost=cost_model.settlement_cost,
+        transfer_cost=cost_model.transfer_cost,
+        total_cost=total_cost,
+        gross_proceeds=gross_proceeds,
+        gross_spread=gross_spread,
+        net_spread=net_spread,
+        gross_return=gross_return,
+        net_return=net_return,
+        fully_executable=fully_executable,
+        execution_ratio=execution_ratio,
     )
