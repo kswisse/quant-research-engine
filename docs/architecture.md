@@ -347,6 +347,11 @@ Providers     └── Kalshi Adapter
                     (detect_same_market_arbitrage)
                             ↓
                     ArbitrageOpportunity
+                            ↓
+                    Arbitrage Cost Model
+                    (evaluate_arbitrage_costs)
+                            ↓
+                    NetArbitrageResult
 ```
 
 ### Components
@@ -366,6 +371,7 @@ Providers     └── Kalshi Adapter
 | `order_book/execution.py` | `consume_book()`, `ExecutionFill`, `ExecutionResult` — mechanical execution simulator |
 | `arbitrage/models.py` | `ArbitrageOpportunity` — detected same-market arbitrage result |
 | `arbitrage/detection.py` | `detect_same_market_arbitrage()` — YES+NO arbitrage detector |
+| `arbitrage/costs.py` | `ArbitrageCostModel`, `NetArbitrageResult`, `evaluate_arbitrage_costs()` — cost evaluation |
 
 ### Key Principles
 
@@ -378,6 +384,7 @@ Providers     └── Kalshi Adapter
 See `docs/market-data.md` for canonical data model documentation.
 See `docs/order-book.md` for order book research model documentation.
 See `docs/arbitrage.md` for arbitrage detection documentation.
+See `docs/arbitrage-costs.md` for arbitrage cost evaluation documentation.
 
 ## Security Principles
 
