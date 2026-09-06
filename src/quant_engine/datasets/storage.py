@@ -117,16 +117,13 @@ class ParquetStorage(StorageBackend):
         actual_checksum = hashlib.sha256(parquet_path.read_bytes()).hexdigest()
         if actual_checksum != manifest.file_checksum:
             raise IntegrityError(
-                f"File checksum mismatch: expected {manifest.file_checksum}, "
-                f"got {actual_checksum}"
+                f"File checksum mismatch: expected {manifest.file_checksum}, got {actual_checksum}"
             )
 
         try:
             df = pl.read_parquet(parquet_path)
         except Exception as e:
-            raise CorruptedDataError(
-                f"Cannot read Parquet file at {parquet_path}: {e}"
-            ) from e
+            raise CorruptedDataError(f"Cannot read Parquet file at {parquet_path}: {e}") from e
 
         records = self._df_to_records(df)
         dataset = Dataset(schema_version=manifest.schema_version, records=records)
@@ -148,7 +145,14 @@ class ParquetStorage(StorageBackend):
     def _sort_records(self, dataset: Dataset) -> list[MarketQuote]:
         """Sort records by (source_timestamp, record_id) for determinism."""
         records_with_id = [(r, r.record_id) for r in dataset.records]
-        records_with_id.sort(key=lambda x: (x[0].source_timestamp.isoformat(), x[1]))
+        records_with_id.sort(
+            key=lambda x: (
+                x[0].ingestion_timestamp.isoformat()
+                if x[0].source_timestamp_missing
+                else x[0].source_timestamp.isoformat(),
+                x[1],
+            )
+        )
         return [r for r, _ in records_with_id]
 
     def _write_parquet(self, dataset: Dataset, path: Path) -> None:
@@ -157,24 +161,25 @@ class ParquetStorage(StorageBackend):
 
         rows = []
         for r in sorted_records:
-            rows.append({
-                "source_timestamp": r.source_timestamp.isoformat(),
-                "ingestion_timestamp": r.ingestion_timestamp.isoformat(),
-                "provider": r.provider,
-                "provider_instrument_id": r.provider_instrument_id,
-                "bid_price": r.bid_price,
-                "bid_size": r.bid_size,
-                "ask_price": r.ask_price,
-                "ask_size": r.ask_size,
-                "schema_version": r.schema_version,
-            })
+            rows.append(
+                {
+                    "source_timestamp": r.source_timestamp.isoformat(),
+                    "source_timestamp_missing": r.source_timestamp_missing,
+                    "ingestion_timestamp": r.ingestion_timestamp.isoformat(),
+                    "provider": r.provider,
+                    "provider_instrument_id": r.provider_instrument_id,
+                    "bid_price": r.bid_price,
+                    "bid_size": r.bid_size,
+                    "ask_price": r.ask_price,
+                    "ask_size": r.ask_size,
+                    "schema_version": r.schema_version,
+                }
+            )
 
         df = pl.DataFrame(rows)
         df.write_parquet(path)
 
-    def _create_manifest(
-        self, dataset: Dataset, parquet_path: Path
-    ) -> DatasetManifest:
+    def _create_manifest(self, dataset: Dataset, parquet_path: Path) -> DatasetManifest:
         """Create manifest from dataset and parquet file."""
         sorted_records = self._sort_records(dataset)
 
@@ -216,9 +221,8 @@ class ParquetStorage(StorageBackend):
             records.append(
                 MarketQuote(
                     source_timestamp=datetime.fromisoformat(row["source_timestamp"]),
-                    ingestion_timestamp=datetime.fromisoformat(
-                        row["ingestion_timestamp"]
-                    ),
+                    source_timestamp_missing=bool(row.get("source_timestamp_missing", False)),
+                    ingestion_timestamp=datetime.fromisoformat(row["ingestion_timestamp"]),
                     provider=row["provider"],
                     provider_instrument_id=row["provider_instrument_id"],
                     bid_price=float(bid_price) if bid_price is not None else None,

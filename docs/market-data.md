@@ -39,6 +39,7 @@ Backtest / Quant Systems
 | Field | Type | Description |
 |-------|------|-------------|
 | source_timestamp | datetime (UTC, tz-aware) | When provider generated the quote |
+| source_timestamp_missing | bool | True if provider has no source timestamp (default False) |
 | ingestion_timestamp | datetime (UTC, tz-aware) | When our system received it |
 | provider | str | Provider identifier |
 | provider_instrument_id | str | Provider's instrument ID |
@@ -64,6 +65,14 @@ Backtest / Quant Systems
 - `source_timestamp`: when the market event occurred at the provider
 - `ingestion_timestamp`: when our system received/recorded it
 - These must never be confused — source time ≠ knowledge time
+- **`source_timestamp_missing`**: Some providers (e.g., Kalshi orderbook)
+  do not expose a source timestamp. In this case:
+  - `source_timestamp` is set to `ingestion_timestamp` for storage
+  - `source_timestamp_missing = True` documents the limitation
+  - Time-order validation skips these records
+  - Record ID excludes source_timestamp to ensure stability
+  - **Do NOT use source_timestamp for look-back windows or event alignment
+    when this flag is True** — it is not the actual exchange-side event time
 
 ## Price/Size Semantics
 
@@ -77,9 +86,13 @@ Backtest / Quant Systems
 Each canonical record has a deterministic ID derived from:
 
 ```
-SHA-256(provider + provider_instrument_id + source_timestamp + payload)
+SHA-256(provider + provider_instrument_id + [source_timestamp] + payload)
   → truncated to 16 hex chars
 ```
+
+When `source_timestamp_missing=True`, `source_timestamp` is excluded from
+the hash. This ensures the same logical data always has the same record_id
+regardless of when it was ingested.
 
 Same payload always produces the same record_id. This enables duplicate detection.
 
@@ -112,6 +125,10 @@ same provider, same instrument, same source timestamp, and same payload.
 
 `validate_time_order()` checks that source_timestamps are non-decreasing.
 It reports violations without reordering.
+
+Records with `source_timestamp_missing=True` are excluded from time-order
+checking because their source_timestamp is not a meaningful exchange-side
+event time.
 
 ## Normalization
 

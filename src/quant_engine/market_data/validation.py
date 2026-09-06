@@ -13,6 +13,8 @@ import math
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from datetime import datetime
+
     from quant_engine.market_data.models import MarketQuote
 
 
@@ -95,6 +97,10 @@ def validate_time_order(quotes: list[MarketQuote]) -> list[dict[str, object]]:
     Checks that source_timestamp is non-decreasing across consecutive records.
     Does NOT reorder — only reports violations.
 
+    When source_timestamp_missing=True, the record is excluded from
+    time-order checking because its source_timestamp is not a meaningful
+    exchange-side event time.
+
     Args:
         quotes: Ordered list of quotes to check.
 
@@ -106,17 +112,20 @@ def validate_time_order(quotes: list[MarketQuote]) -> list[dict[str, object]]:
         Empty list means no violations.
     """
     violations: list[dict[str, object]] = []
-    for i in range(1, len(quotes)):
-        prev_ts = quotes[i - 1].source_timestamp
-        curr_ts = quotes[i].source_timestamp
-        if curr_ts < prev_ts:
+    # Find the last non-missing timestamp for comparison
+    last_valid_ts: datetime | None = None
+    for i, q in enumerate(quotes):
+        if q.source_timestamp_missing:
+            continue
+        if last_valid_ts is not None and q.source_timestamp < last_valid_ts:
             violations.append(
                 {
                     "index": i,
-                    "timestamp": curr_ts.isoformat(),
-                    "previous_timestamp": prev_ts.isoformat(),
+                    "timestamp": q.source_timestamp.isoformat(),
+                    "previous_timestamp": last_valid_ts.isoformat(),
                 }
             )
+        last_valid_ts = q.source_timestamp
     return violations
 
 

@@ -37,7 +37,12 @@ class DatasetReplay:
 
         records_with_id = [(r, r.record_id) for r in dataset.records]
         records_with_id.sort(
-            key=lambda x: (x[0].source_timestamp.isoformat(), x[1])
+            key=lambda x: (
+                x[0].ingestion_timestamp.isoformat()
+                if x[0].source_timestamp_missing
+                else x[0].source_timestamp.isoformat(),
+                x[1],
+            )
         )
         self._records = [r for r, _ in records_with_id]
 

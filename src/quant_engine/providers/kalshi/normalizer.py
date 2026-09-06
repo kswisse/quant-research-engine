@@ -167,7 +167,10 @@ class KalshiNormalizer(MarketDataNormalizer):
         if ingestion_timestamp is None:
             ingestion_timestamp = self._clock()
 
-        # Kalshi orderbook has no timestamp; use ingestion time as source
+        # Kalshi orderbook has no timestamp; use ingestion time as source.
+        # Mark source_timestamp_missing so downstream consumers know this
+        # is NOT the actual exchange-side event time.
+        source_timestamp_missing = source_timestamp is None
         if source_timestamp is None:
             source_timestamp = ingestion_timestamp
 
@@ -180,6 +183,7 @@ class KalshiNormalizer(MarketDataNormalizer):
 
         return MarketQuote(
             source_timestamp=source_timestamp,
+            source_timestamp_missing=source_timestamp_missing,
             ingestion_timestamp=ingestion_timestamp,
             provider=self.PROVIDER,
             provider_instrument_id=ticker,

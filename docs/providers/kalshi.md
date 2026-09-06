@@ -136,9 +136,25 @@ Arrays are sorted ascending by price. **Best bid is the last element** (highest 
 |--------|--------|
 | Format | ISO 8601 datetime string |
 | Timezone | UTC (e.g., `"2024-01-15T10:30:00Z"`) |
-| Orderbook timestamps | **Not provided** — use ingestion time as source |
+| Orderbook timestamps | **Not provided** — see `source_timestamp_missing` |
 
-The orderbook endpoint does NOT return a timestamp. When `source_timestamp` is not provided, the normalizer uses `ingestion_timestamp` as the source timestamp.
+The orderbook endpoint does NOT return a timestamp. When `source_timestamp` is not provided, the normalizer uses `ingestion_timestamp` as the source timestamp and sets `source_timestamp_missing=True`.
+
+### Semantic Limitation
+
+When `source_timestamp_missing=True`:
+
+- `source_timestamp` is set to `ingestion_timestamp` for storage
+- This is **NOT** the actual exchange-side event time
+- **Do NOT use for:**
+  - Look-back window calculation
+  - Event alignment across providers
+  - Latency research
+  - Historical event reconstruction
+- Time-order validation skips these records
+- Record ID excludes source_timestamp for stability
+
+This is a known limitation of the Kalshi API. Future endpoints (e.g., trades, events) may expose timestamps.
 
 ## Pagination
 
@@ -191,6 +207,7 @@ Same raw response → same normalized `MarketQuote` (except `ingestion_timestamp
 ```python
 MarketQuote(
     source_timestamp=datetime(2025, 1, 1, 12, 0, tzinfo=UTC),
+    source_timestamp_missing=True,  # Kalshi orderbook has no timestamp
     ingestion_timestamp=datetime(2025, 1, 1, 12, 0, tzinfo=UTC),
     provider="kalshi",
     provider_instrument_id="KXMLIFE-26-SEP05-100-ABOVE",

@@ -8,6 +8,15 @@ Timestamp policy:
     - ingestion_timestamp: when our system received/recorded it
     - Both must be UTC, timezone-aware
     - Never accept naive datetimes
+    - source_timestamp_missing: True when the provider does not expose a
+      source timestamp (e.g., Kalshi orderbook). In this case,
+      source_timestamp is set to ingestion_timestamp for storage purposes,
+      but source_timestamp_missing documents that it is NOT the actual
+      exchange-side event time. This distinction matters for:
+      - look-ahead bias prevention
+      - latency research
+      - event alignment
+      - replay ordering
 
 Price/size semantics:
     - float representation for NumPy/Polars/Arrow compatibility
@@ -19,6 +28,9 @@ Record identity:
       source_timestamp, bid_price, bid_size, ask_price, ask_size)
     - Truncated to 16 hex chars
     - Same payload always produces same ID
+    - When source_timestamp_missing=True, source_timestamp is excluded from
+      the hash to ensure the same logical data always has the same record_id
+      regardless of when it was ingested.
 """
 
 from __future__ import annotations
@@ -46,13 +58,17 @@ class MarketQuote(BaseModel):
 
     Attributes:
         source_timestamp: When the provider generated this quote (UTC).
+        source_timestamp_missing: True when the provider does not expose a
+            source timestamp. When True, source_timestamp is set to
+            ingestion_timestamp and should NOT be treated as the actual
+            exchange-side event time.
         ingestion_timestamp: When our system received this quote (UTC).
         provider: Provider identifier (e.g. "polymarket", "kalshi").
         provider_instrument_id: Provider's instrument identifier.
         bid_price: Best bid price (None if no bid available).
         bid_size: Best bid size (None if no bid available).
-        ask_price: Best ask price (None if no ask available).
-        ask_size: Best ask size (None if no ask available).
+        ask_price: Best ask price (None if no bid available).
+        ask_size: Best ask size (None if no bid available).
         schema_version: Schema version for forward compatibility.
     """
 
@@ -60,6 +76,7 @@ class MarketQuote(BaseModel):
 
     # Timestamps — both must be UTC, timezone-aware
     source_timestamp: datetime
+    source_timestamp_missing: bool = False
     ingestion_timestamp: datetime
 
     # Instrument identity
@@ -99,22 +116,29 @@ class MarketQuote(BaseModel):
         return hashlib.sha256(canonical.encode()).hexdigest()[:16]
 
     def _canonical_payload(self) -> str:
-        """Canonical JSON for record ID derivation."""
-        d = {
+        """Canonical JSON for record ID derivation.
+
+        When source_timestamp_missing=True, source_timestamp is excluded from
+        the hash. This ensures the same logical data always has the same
+        record_id regardless of when it was ingested.
+        """
+        d: dict[str, object] = {
             "provider": self.provider,
             "provider_instrument_id": self.provider_instrument_id,
-            "source_timestamp": self.source_timestamp.isoformat(),
             "bid_price": self.bid_price,
             "bid_size": self.bid_size,
             "ask_price": self.ask_price,
             "ask_size": self.ask_size,
         }
+        if not self.source_timestamp_missing:
+            d["source_timestamp"] = self.source_timestamp.isoformat()
         return json.dumps(d, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
 
     def to_dict(self) -> dict[str, object]:
         """Serialize to a JSON-compatible dictionary."""
         return {
             "source_timestamp": self.source_timestamp.isoformat(),
+            "source_timestamp_missing": self.source_timestamp_missing,
             "ingestion_timestamp": self.ingestion_timestamp.isoformat(),
             "provider": self.provider,
             "provider_instrument_id": self.provider_instrument_id,
@@ -131,6 +155,7 @@ class MarketQuote(BaseModel):
         """Deserialize from a dictionary."""
         return cls(
             source_timestamp=datetime.fromisoformat(d["source_timestamp"]),
+            source_timestamp_missing=bool(d.get("source_timestamp_missing", False)),
             ingestion_timestamp=datetime.fromisoformat(d["ingestion_timestamp"]),
             provider=d["provider"],
             provider_instrument_id=d["provider_instrument_id"],
@@ -164,14 +189,24 @@ class Dataset(BaseModel):
         """Deterministic dataset identifier.
 
         Derived from schema_version and sorted record IDs.
-        Records are sorted by (source_timestamp, record_id) to ensure
+        Records are sorted by (sort_timestamp, record_id) to ensure
         the same logical dataset always produces the same ID regardless
         of insertion order.
+
+        When source_timestamp_missing=True, uses ingestion_timestamp
+        for sorting (since source_timestamp is not meaningful).
         """
         records_with_id = [(r, r.record_id) for r in self.records]
-        records_with_id.sort(
-            key=lambda x: (x[0].source_timestamp.isoformat(), x[1])
-        )
+
+        def _sort_key(item: tuple[MarketQuote, str]) -> tuple[str, str]:
+            r, rid = item
+            if r.source_timestamp_missing:
+                ts = r.ingestion_timestamp.isoformat()
+            else:
+                ts = r.source_timestamp.isoformat()
+            return (ts, rid)
+
+        records_with_id.sort(key=_sort_key)
         record_ids = [rid for _, rid in records_with_id]
         canonical = json.dumps(
             {
