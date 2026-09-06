@@ -326,28 +326,38 @@ canonical data models for quantitative research.
 External ─────┤
 Providers     └── Kalshi Adapter
                      ↓
-               MarketQuote (canonical)
+               MarketQuote (canonical, top-of-book)
                      ↓
-        validate_quote() / validate_time_order()
+         validate_quote() / validate_time_order()
                      ↓
                   Dataset
                      ↓
-                  Replay
-                     ↓
-           Research / Backtest Systems
+        ┌────────────┴────────────┐
+        ↓                         ↓
+    Replay                  OrderBookSnapshot
+        ↓                    (depth-aware research)
+    Research /               ↓
+    Backtest Systems    Pure Calculations
+                        (spread, depth, consumption)
+                            ↓
+                    Future Execution /
+                    Arbitrage Research
 ```
 
 ### Components
 
 | Module | Purpose |
 |--------|---------|
-| `models.py` | `MarketQuote`, `Dataset` — canonical data models |
-| `errors.py` | `MarketDataError`, `InvalidQuoteError`, etc. |
-| `validation.py | `validate_quote()`, `validate_time_order()`, `find_duplicates()` |
-| `normalization.py` | `MarketDataNormalizer` ABC, `ExampleNormalizer` |
+| `market_data/models.py` | `MarketQuote`, `Dataset` — canonical data models |
+| `market_data/errors.py` | `MarketDataError`, `InvalidQuoteError`, etc. |
+| `market_data/validation.py` | `validate_quote()`, `validate_time_order()`, `find_duplicates()` |
+| `market_data/normalization.py` | `MarketDataNormalizer` ABC, `ExampleNormalizer` |
 | `providers/polymarket/` | Polymarket CLOB + Gamma API adapter |
 | `providers/kalshi/` | Kalshi Trade API v2 adapter |
 | `datasets/` | Historical dataset persistence and replay |
+| `order_book/models.py` | `OrderBookLevel`, `OrderBookSnapshot` — depth-aware research models |
+| `order_book/validation.py` | `validate_snapshot()` — order book validation |
+| `order_book/calculations.py` | `best_bid()`, `best_ask()`, `spread()`, `cumulative_depth()` |
 
 ### Key Principles
 
@@ -355,8 +365,10 @@ Providers     └── Kalshi Adapter
 - **Deterministic identity:** SHA-256 record and dataset IDs
 - **Provenance:** Source vs ingestion timestamps preserved
 - **Validation at boundary:** Invalid data rejected before research use
+- **Separation of concerns:** MarketQuote for top-of-book, OrderBookSnapshot for depth
 
-See `docs/market-data.md` for full documentation.
+See `docs/market-data.md` for canonical data model documentation.
+See `docs/order-book.md` for order book research model documentation.
 
 ## Security Principles
 
