@@ -338,10 +338,15 @@ Providers     └── Kalshi Adapter
         ↓                    (depth-aware research)
     Research /               ↓
     Backtest Systems    Pure Calculations
-                        (spread, depth, consumption)
+                    (spread, depth, consumption)
                             ↓
-                    Future Execution /
-                    Arbitrage Research
+                    Mechanical Execution
+                    (consume_book)
+                            ↓
+                    Same-Market Arbitrage
+                    (detect_same_market_arbitrage)
+                            ↓
+                    ArbitrageOpportunity
 ```
 
 ### Components
@@ -359,6 +364,8 @@ Providers     └── Kalshi Adapter
 | `order_book/validation.py` | `validate_snapshot()` — order book validation |
 | `order_book/calculations.py` | `best_bid()`, `best_ask()`, `spread()`, `cumulative_depth()` |
 | `order_book/execution.py` | `consume_book()`, `ExecutionFill`, `ExecutionResult` — mechanical execution simulator |
+| `arbitrage/models.py` | `ArbitrageOpportunity` — detected same-market arbitrage result |
+| `arbitrage/detection.py` | `detect_same_market_arbitrage()` — YES+NO arbitrage detector |
 
 ### Key Principles
 
@@ -370,6 +377,7 @@ Providers     └── Kalshi Adapter
 
 See `docs/market-data.md` for canonical data model documentation.
 See `docs/order-book.md` for order book research model documentation.
+See `docs/arbitrage.md` for arbitrage detection documentation.
 
 ## Security Principles
 
