@@ -124,9 +124,45 @@ net_return = net_spread / total_cost
 
 ## Market Identity Assumption
 
-Phase 2.4 assumes that the two venue instruments have already been validated as the same economic market and outcome. Full resolution-semantic identity belongs to Phase 2.5.
+Phase 2.4 assumed that the two venue instruments have already been validated as the same economic market and outcome.
 
-The detector accepts caller-supplied identity through the `outcome_label` parameter. Whether two order books actually represent the same outcome is the caller's responsibility.
+**Phase 2.5 update:** The detector now accepts an optional `MarketMapping` parameter for explicit identity validation.
+
+```python
+def detect_cross_venue_arbitrage(
+    buy_book: OrderBookSnapshot,
+    sell_book: OrderBookSnapshot,
+    requested_size: float,
+    outcome_label: str = "outcome",
+    mapping: MarketMapping | None = None,
+) -> CrossVenueOpportunity | None:
+```
+
+### With Mapping
+
+When a `MarketMapping` is provided:
+- The detector validates that order books match the mapping's provider/instrument identity
+- The mapping is carried through to `CrossVenueOpportunity` and `NetCrossVenueResult`
+- The outcome label is taken from the mapping (not the caller)
+
+### Without Mapping (Backward Compatible)
+
+When `mapping=None`:
+- Backward compatible with Phase 2.4 behavior
+- No identity validation is performed
+- The caller is responsible for ensuring the markets are equivalent
+- An absent/unvalidated mapping must never silently establish economic equivalence
+
+### Why Mapping Is Required
+
+Without explicit mapping, cross-venue arbitrage detection operates on unvalidated identity. This can produce false arbitrage signals when:
+- Two markets have similar titles but resolve on different events
+- Resolution sources differ (e.g., AP vs Reuters)
+- Settlement terms differ (e.g., binary vs proportional)
+- Expiry times differ
+- One market is void/cancelled while the other is active
+
+See [Market Identity & Resolution Semantics](market-identity.md) for details.
 
 ## Limitations
 

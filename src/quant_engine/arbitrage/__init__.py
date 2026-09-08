@@ -25,11 +25,13 @@ from quant_engine.arbitrage.cross_venue import (
 )
 from quant_engine.arbitrage.detection import detect_same_market_arbitrage
 from quant_engine.arbitrage.models import ArbitrageOpportunity
+from quant_engine.market_identity.mapping import MarketMapping
 
 __all__ = [
     "ArbitrageCostModel",
     "ArbitrageOpportunity",
     "CrossVenueOpportunity",
+    "MarketMapping",
     "NetArbitrageResult",
     "NetCrossVenueResult",
     "detect_cross_venue_arbitrage",

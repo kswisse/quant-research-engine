@@ -26,12 +26,13 @@ Architecture:
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from quant_engine.order_book.execution import consume_book
 
 if TYPE_CHECKING:
+    from quant_engine.market_identity.mapping import MarketMapping
     from quant_engine.order_book.execution import ExecutionResult
     from quant_engine.order_book.models import OrderBookSnapshot
 
@@ -60,6 +61,7 @@ class CrossVenueOpportunity:
         gross_spread: sell_notional - buy_notional (positive = profitable).
         gross_return: gross_spread / buy_notional. None if buy_notional == 0.
         fully_executable: True if requested_size was fully profitable.
+        mapping: Optional MarketMapping if cross-market identity was validated.
     """
 
     outcome_label: str
@@ -74,6 +76,7 @@ class CrossVenueOpportunity:
     gross_spread: float
     gross_return: float | None
     fully_executable: bool
+    mapping: MarketMapping | None = field(default=None)
 
 
 def detect_cross_venue_arbitrage(
@@ -81,6 +84,7 @@ def detect_cross_venue_arbitrage(
     sell_book: OrderBookSnapshot,
     requested_size: float,
     outcome_label: str = "outcome",
+    mapping: MarketMapping | None = None,
 ) -> CrossVenueOpportunity | None:
     """Detect cross-venue arbitrage opportunity.
 
@@ -99,6 +103,7 @@ def detect_cross_venue_arbitrage(
         sell_book: Order book for the sell leg (consume bids).
         requested_size: Number of contracts to trade. Must be > 0 and finite.
         outcome_label: Human-readable outcome description.
+        mapping: Optional validated MarketMapping for cross-market identity.
 
     Returns:
         CrossVenueOpportunity if profitable, None otherwise.
@@ -157,4 +162,5 @@ def detect_cross_venue_arbitrage(
         gross_spread=gross_spread,
         gross_return=gross_return,
         fully_executable=(executable_size == requested_size),
+        mapping=mapping,
     )

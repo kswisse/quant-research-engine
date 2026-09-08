@@ -30,12 +30,13 @@ Architecture:
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from quant_engine.arbitrage.cross_venue import CrossVenueOpportunity
     from quant_engine.arbitrage.models import ArbitrageOpportunity
+    from quant_engine.market_identity.mapping import MarketMapping
 
 
 @dataclass(frozen=True)
@@ -280,6 +281,7 @@ class NetCrossVenueResult:
         net_return: net_spread / total_cost. None if total_cost == 0.
         fully_executable: True if buy_filled == sell_filled.
         execution_ratio: executable_size / requested_size. None if requested_size == 0.
+        mapping: Optional MarketMapping if cross-market identity was validated.
     """
 
     outcome_label: str
@@ -307,6 +309,7 @@ class NetCrossVenueResult:
     net_return: float | None
     fully_executable: bool
     execution_ratio: float | None
+    mapping: MarketMapping | None = field(default=None)
 
 
 def evaluate_cross_venue_costs(
@@ -397,4 +400,5 @@ def evaluate_cross_venue_costs(
         net_return=net_return,
         fully_executable=fully_executable,
         execution_ratio=execution_ratio,
+        mapping=opportunity.mapping,
     )
