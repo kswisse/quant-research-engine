@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from quant_engine.backtest.types import OverfittingDiagnosis, BacktestResult
+from quant_engine.backtest.types import BacktestResult, OverfittingDiagnosis
 from quant_engine.statistics.types import (
     ExperimentConfig,
     ReturnSeries,

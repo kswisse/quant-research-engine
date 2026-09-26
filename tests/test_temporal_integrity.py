@@ -8,7 +8,6 @@ and negative cases (information that would violate temporal order).
 from __future__ import annotations
 
 import numpy as np
-import pytest
 
 from quant_engine.backtest.data import PriceData
 from quant_engine.backtest.engine import run_backtest

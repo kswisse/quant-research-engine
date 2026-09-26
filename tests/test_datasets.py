@@ -17,8 +17,7 @@ All tests use tmp_path for isolation and require no network access.
 from __future__ import annotations
 
 import json
-import math
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 

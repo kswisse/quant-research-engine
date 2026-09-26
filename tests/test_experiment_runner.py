@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from quant_engine.experiments.config import ExperimentConfig
-from quant_engine.experiments.results import ExperimentResult, PerformanceSummary, StrategyResult
+from quant_engine.experiments.results import ExperimentResult, PerformanceSummary
 from quant_engine.experiments.runner import ExperimentRunner
 
 

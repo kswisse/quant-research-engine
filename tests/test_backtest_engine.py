@@ -6,12 +6,11 @@ import numpy as np
 import pytest
 
 from quant_engine.backtest.data import PriceData
-from quant_engine.backtest.engine import BacktestOutput, run_backtest
+from quant_engine.backtest.engine import run_backtest
 from quant_engine.backtest.strategies import (
     AlwaysFlat,
     AlwaysShort,
     BuyAndHold,
-    SMACrossover,
 )
 
 

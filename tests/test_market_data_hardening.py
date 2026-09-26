@@ -17,7 +17,6 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
-from unittest.mock import patch
 
 import pytest
 
@@ -39,10 +38,9 @@ from quant_engine.providers.polymarket.models import (
 )
 from quant_engine.providers.polymarket.normalizer import PolymarketNormalizer
 
-
-# ══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 # HELPERS
-# ══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 # Deterministic clock: frozen at a known instant
 FROZEN_CLOCK = datetime(2026, 3, 15, 10, 0, 0, tzinfo=UTC)
@@ -126,9 +124,9 @@ def _make_order_book_summary(
     )
 
 
-# ══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 # 1. TIMESTAMP TESTS
-# ══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 
 class TestTimestampSemantics:
@@ -139,7 +137,7 @@ class TestTimestampSemantics:
         clock_time = datetime(2026, 6, 1, 12, 0, 0, tzinfo=UTC)
         normalizer = _make_polymarket_normalizer(clock=lambda: clock_time)
 
-        # API timestamp is epoch ms: 1782753357257 → 2026-08-28T12:35:57.257Z
+        # API timestamp is epoch ms: 1782753357257 â†’ 2026-08-28T12:35:57.257Z
         book = _make_order_book_summary(
             bids=[OrderBookLevel(price="0.55", size="100")],
             asks=[OrderBookLevel(price="0.60", size="100")],
@@ -168,7 +166,7 @@ class TestTimestampSemantics:
         )
         quote = normalizer.normalize_orderbook(ticker="T-1", orderbook=orderbook)
 
-        # Both timestamps are identical — Kalshi conflates them
+        # Both timestamps are identical â€” Kalshi conflates them
         assert quote.source_timestamp == quote.ingestion_timestamp
         assert quote.source_timestamp == clock_time
 
@@ -278,16 +276,16 @@ class TestTimestampSemantics:
     def test_polymarket_source_is_utc_from_epoch(self) -> None:
         """Polymarket _parse_timestamp converts epoch ms to UTC datetime."""
         normalizer = _make_polymarket_normalizer()
-        # Epoch ms 1782753357257 → known UTC datetime
+        # Epoch ms 1782753357257 â†’ known UTC datetime
         result = normalizer._parse_timestamp("1782753357257")
         assert result.tzinfo is not None
         assert result.tzinfo == UTC
         assert result.year == 2026
 
 
-# ══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 # 2. CROSSED MARKET TESTS
-# ══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 
 class TestCrossedMarket:
@@ -299,19 +297,19 @@ class TestCrossedMarket:
         assert validate_quote(q) == []
 
     def test_zero_spread_accepted(self) -> None:
-        """bid == ask (zero spread) passes validation — not crossed."""
+        """bid == ask (zero spread) passes validation â€” not crossed."""
         q = _make_quote(bid=0.55, ask=0.55)
         errors = validate_quote(q)
         assert errors == []
 
     def test_crossed_market_rejected(self) -> None:
-        """bid > ask is a crossed market — must be rejected."""
+        """bid > ask is a crossed market â€” must be rejected."""
         q = _make_quote(bid=0.70, ask=0.50)
         errors = validate_quote(q)
         assert any("crossed" in e for e in errors)
 
     def test_no_silent_clamping(self) -> None:
-        """A crossed market quote is not modified — validation reports errors, doesn't fix."""
+        """A crossed market quote is not modified â€” validation reports errors, doesn't fix."""
         bid, ask = 0.70, 0.50
         q = _make_quote(bid=bid, ask=ask)
         # Model stores the crossed values as-is
@@ -332,7 +330,7 @@ class TestCrossedMarket:
         assert any("0.8" in e and "0.4" in e for e in errors)
 
     def test_crossed_market_from_kalshi_duality(self) -> None:
-        """Kalshi duality can produce crossed markets — normalizer doesn't prevent it.
+        """Kalshi duality can produce crossed markets â€” normalizer doesn't prevent it.
 
         When YES bid > 1.0 - best NO bid, the derived market is crossed.
         The normalizer emits the quote; validate_quote catches it.
@@ -340,7 +338,7 @@ class TestCrossedMarket:
         normalizer = _make_kalshi_normalizer()
         orderbook = _make_orderbook_response(
             yes_dollars=[["0.6000", "100.00"]],  # YES bid = 0.60
-            no_dollars=[["0.5000", "100.00"]],   # NO bid = 0.50 → YES ask = 0.50
+            no_dollars=[["0.5000", "100.00"]],   # NO bid = 0.50 â†’ YES ask = 0.50
         )
         quote = normalizer.normalize_orderbook(ticker="T-1", orderbook=orderbook)
 
@@ -353,11 +351,11 @@ class TestCrossedMarket:
         assert any("crossed" in e for e in errors)
 
     def test_kalshi_duality_valid_wide_spread(self) -> None:
-        """Kalshi duality with valid spread — no crossing."""
+        """Kalshi duality with valid spread â€” no crossing."""
         normalizer = _make_kalshi_normalizer()
         orderbook = _make_orderbook_response(
             yes_dollars=[["0.5000", "100.00"]],  # YES bid = 0.50
-            no_dollars=[["0.4000", "100.00"]],   # NO bid = 0.40 → YES ask = 0.60
+            no_dollars=[["0.4000", "100.00"]],   # NO bid = 0.40 â†’ YES ask = 0.60
         )
         quote = normalizer.normalize_orderbook(ticker="T-1", orderbook=orderbook)
         assert quote.bid_price == 0.50
@@ -365,11 +363,11 @@ class TestCrossedMarket:
         assert validate_quote(quote) == []
 
     def test_kalshi_duality_zero_spread(self) -> None:
-        """Kalshi duality with bid == ask — zero spread, valid."""
+        """Kalshi duality with bid == ask â€” zero spread, valid."""
         normalizer = _make_kalshi_normalizer()
         orderbook = _make_orderbook_response(
             yes_dollars=[["0.5000", "100.00"]],  # YES bid = 0.50
-            no_dollars=[["0.5000", "100.00"]],   # NO bid = 0.50 → YES ask = 0.50
+            no_dollars=[["0.5000", "100.00"]],   # NO bid = 0.50 â†’ YES ask = 0.50
         )
         quote = normalizer.normalize_orderbook(ticker="T-1", orderbook=orderbook)
         assert quote.bid_price == 0.50
@@ -388,9 +386,9 @@ class TestCrossedMarket:
         assert 2 not in errors  # valid
 
 
-# ══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 # 3. DATASET SAFETY TESTS
-# ══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 
 class TestDatasetSafety:
@@ -399,11 +397,11 @@ class TestDatasetSafety:
     def test_crossed_quote_cannot_be_added_without_validation(self) -> None:
         """Dataset accepts any MarketQuote at construction (Pydantic model).
 
-        The safety valve is validate_quote — Dataset is a data container,
+        The safety valve is validate_quote â€” Dataset is a data container,
         validation is a separate layer. This test documents that pattern.
         """
         q_crossed = _make_quote(bid=0.80, ask=0.40)
-        # Dataset construction succeeds — it's a data container
+        # Dataset construction succeeds â€” it's a data container
         ds = Dataset(records=[q_crossed])
         assert len(ds.records) == 1
         # But validate_quote catches the problem
@@ -431,12 +429,12 @@ class TestDatasetSafety:
 
         q = _make_quote(bid=0.80, ask=0.40)
         ds = Dataset(records=[q])
-        # save_dataset itself doesn't validate quotes — it persists the data.
+        # save_dataset itself doesn't validate quotes â€” it persists the data.
         # The safety pattern is: validate BEFORE save.
         # This test documents that save_dataset doesn't silently fix data.
         path = tmp_path / "crossed_test"
         save_dataset(ds, path)
-        # The data is persisted as-is — validation is upstream
+        # The data is persisted as-is â€” validation is upstream
         assert path.exists()
 
     def test_invalid_quote_rejected_before_save(self, tmp_path: Path) -> None:
@@ -446,7 +444,7 @@ class TestDatasetSafety:
         q = _make_quote(bid=0.80, ask=0.40)
         errors = validate_quote(q)
         if errors:
-            # Don't save — validation failed
+            # Don't save â€” validation failed
             assert any("crossed" in e for e in errors)
         else:
             # Would save
@@ -468,7 +466,7 @@ class TestDatasetSafety:
         assert path.exists()
 
     def test_none_sided_quote_is_valid_for_dataset(self, tmp_path: Path) -> None:
-        """Quote with None bid/ask is valid — one-sided books are allowed."""
+        """Quote with None bid/ask is valid â€” one-sided books are allowed."""
         from quant_engine.datasets import save_dataset
 
         q = MarketQuote(
@@ -488,9 +486,9 @@ class TestDatasetSafety:
         assert path.exists()
 
 
-# ══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 # 4. PROVIDER CONFORMANCE TESTS
-# ══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 
 class TestProviderConformance:
@@ -535,7 +533,7 @@ class TestProviderConformance:
         assert quote.provider_instrument_id == "my-token-id"
 
     def test_kalshi_handles_missing_provider_timestamp(self) -> None:
-        """Kalshi orderbook has no timestamp — normalizer defaults source=ingestion."""
+        """Kalshi orderbook has no timestamp â€” normalizer defaults source=ingestion."""
         normalizer = _make_kalshi_normalizer()
         orderbook = _make_orderbook_response(
             yes_dollars=[["0.5000", "100.00"]],
@@ -594,7 +592,7 @@ class TestProviderConformance:
         assert kal_quote.ingestion_timestamp.tzinfo is not None
 
     def test_polymarket_empty_book_produces_valid_quote(self) -> None:
-        """Empty Polymarket orderbook → valid quote with None sides."""
+        """Empty Polymarket orderbook â†’ valid quote with None sides."""
         normalizer = _make_polymarket_normalizer()
         book = _make_order_book_summary(bids=[], asks=[])
         quote = normalizer.normalize_order_book(token_id="T-1", order_book=book)
@@ -603,7 +601,7 @@ class TestProviderConformance:
         assert validate_quote(quote) == []
 
     def test_kalshi_empty_book_produces_valid_quote(self) -> None:
-        """Empty Kalshi orderbook → valid quote with None sides."""
+        """Empty Kalshi orderbook â†’ valid quote with None sides."""
         normalizer = _make_kalshi_normalizer()
         orderbook = _make_orderbook_response(yes_dollars=[], no_dollars=[])
         quote = normalizer.normalize_orderbook(ticker="T-1", orderbook=orderbook)
@@ -612,17 +610,17 @@ class TestProviderConformance:
         assert validate_quote(quote) == []
 
 
-# ══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 # 5. REPLAY TESTS
-# ══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 
 class TestReplayFidelity:
-    """save → load → replay preserves timestamp semantics and order."""
+    """save â†’ load â†’ replay preserves timestamp semantics and order."""
 
     def test_replay_preserves_timestamp_semantics(self, tmp_path: Path) -> None:
-        """After save → load → replay, timestamps are identical to originals."""
-        from quant_engine.datasets import load_dataset, replay_dataset, save_dataset
+        """After save â†’ load â†’ replay, timestamps are identical to originals."""
+        from quant_engine.datasets import load_dataset, save_dataset
 
         q = _make_quote(
             source_ts=datetime(2026, 3, 15, 9, 0, 0, tzinfo=UTC),
@@ -639,7 +637,7 @@ class TestReplayFidelity:
         assert restored.source_timestamp != restored.ingestion_timestamp
 
     def test_replay_preserves_polymarket_timestamps(self, tmp_path: Path) -> None:
-        """Polymarket timestamps survive save → load → replay."""
+        """Polymarket timestamps survive save â†’ load â†’ replay."""
         from quant_engine.datasets import load_dataset, save_dataset
 
         # Polymarket quote with distinct source (API) and ingestion (clock) times
@@ -660,7 +658,7 @@ class TestReplayFidelity:
         assert restored.ingestion_timestamp == ingestion
 
     def test_replay_preserves_kalshi_conflated_timestamps(self, tmp_path: Path) -> None:
-        """Kalshi conflated timestamps survive save → load → replay."""
+        """Kalshi conflated timestamps survive save â†’ load â†’ replay."""
         from quant_engine.datasets import load_dataset, save_dataset
 
         ts = datetime(2026, 3, 15, 10, 0, 0, tzinfo=UTC)
@@ -675,7 +673,7 @@ class TestReplayFidelity:
         loaded = load_dataset(tmp_path)
         restored = loaded.records[0]
 
-        # Both still equal — conflated timestamp preserved
+        # Both still equal â€” conflated timestamp preserved
         assert restored.source_timestamp == restored.ingestion_timestamp
         assert restored.source_timestamp == ts
 
@@ -729,7 +727,7 @@ class TestReplayFidelity:
         assert timestamps == sorted(timestamps)
 
     def test_replay_preserves_record_identities(self, tmp_path: Path) -> None:
-        """Record IDs are preserved through save → load → replay."""
+        """Record IDs are preserved through save â†’ load â†’ replay."""
         from quant_engine.datasets import replay_dataset, save_dataset
 
         quotes = [
@@ -744,7 +742,7 @@ class TestReplayFidelity:
         assert replayed_ids == original_ids
 
     def test_replay_preserves_provider_field(self, tmp_path: Path) -> None:
-        """Provider field survives save → load → replay."""
+        """Provider field survives save â†’ load â†’ replay."""
         from quant_engine.datasets import replay_dataset, save_dataset
 
         q_poly = _make_quote(provider="polymarket", instrument="P1")
@@ -756,7 +754,7 @@ class TestReplayFidelity:
         assert providers == {"polymarket", "kalshi"}
 
     def test_replay_preserves_none_sides(self, tmp_path: Path) -> None:
-        """None bid/ask survive save → load → replay."""
+        """None bid/ask survive save â†’ load â†’ replay."""
         from quant_engine.datasets import load_dataset, save_dataset
 
         q = MarketQuote(
@@ -816,9 +814,9 @@ class TestReplayFidelity:
         assert kal_restored.source_timestamp == kal_ts
 
 
-# ══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 # 6. SOURCE TIMESTAMP MISSING TESTS
-# ══════════════════════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 
 class TestSourceTimestampMissing:
@@ -864,10 +862,8 @@ class TestSourceTimestampMissing:
         ts1 = datetime(2026, 3, 15, 9, 0, 0, tzinfo=UTC)
         ts2 = datetime(2026, 3, 15, 10, 0, 0, tzinfo=UTC)
 
-        q1 = _make_quote(source_ts=ts1, ingest_ts=ts1)
-        q2 = _make_quote(source_ts=ts2, ingest_ts=ts2)
 
-        # Same logical data, different ingestion times → same record_id
+        # Same logical data, different ingestion times â†’ same record_id
         q_missing_early = MarketQuote(
             source_timestamp=ts1,
             source_timestamp_missing=True,
@@ -921,7 +917,7 @@ class TestSourceTimestampMissing:
             ask_price=0.6,
             ask_size=100.0,
         )
-        # Different source timestamps → different record_ids
+        # Different source timestamps â†’ different record_ids
         assert q1.record_id != q2.record_id
 
     def test_to_dict_includes_field(self) -> None:
@@ -1021,7 +1017,7 @@ class TestSourceTimestampMissing:
         assert ds.dataset_id == ds2.dataset_id
 
     def test_save_load_preserves_source_timestamp_missing(self, tmp_path: Path) -> None:
-        """save → load preserves source_timestamp_missing."""
+        """save â†’ load preserves source_timestamp_missing."""
         from quant_engine.datasets import load_dataset, save_dataset
 
         q = MarketQuote(
@@ -1043,7 +1039,7 @@ class TestSourceTimestampMissing:
         assert restored.source_timestamp_missing is True
 
     def test_replay_preserves_source_timestamp_missing(self, tmp_path: Path) -> None:
-        """save → replay preserves source_timestamp_missing."""
+        """save â†’ replay preserves source_timestamp_missing."""
         from quant_engine.datasets import replay_dataset, save_dataset
 
         q = MarketQuote(

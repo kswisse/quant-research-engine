@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime
 
 import pytest
 
@@ -352,8 +352,8 @@ class TestNormalization:
         assert quote.ask_price is None
 
     def test_rejects_missing_provider(self) -> None:
-        from quant_engine.market_data.normalization import ExampleNormalizer
         from quant_engine.market_data.errors import NormalizationError
+        from quant_engine.market_data.normalization import ExampleNormalizer
 
         normalizer = ExampleNormalizer()
         raw = {"instrument_id": "X", "timestamp": "2026-09-04T01:00:00+00:00"}
@@ -361,8 +361,8 @@ class TestNormalization:
             normalizer.normalize(raw)
 
     def test_rejects_missing_instrument(self) -> None:
-        from quant_engine.market_data.normalization import ExampleNormalizer
         from quant_engine.market_data.errors import NormalizationError
+        from quant_engine.market_data.normalization import ExampleNormalizer
 
         normalizer = ExampleNormalizer()
         raw = {"provider": "example", "timestamp": "2026-09-04T01:00:00+00:00"}
@@ -370,8 +370,8 @@ class TestNormalization:
             normalizer.normalize(raw)
 
     def test_rejects_missing_timestamp(self) -> None:
-        from quant_engine.market_data.normalization import ExampleNormalizer
         from quant_engine.market_data.errors import NormalizationError
+        from quant_engine.market_data.normalization import ExampleNormalizer
 
         normalizer = ExampleNormalizer()
         raw = {"provider": "example", "instrument_id": "X"}

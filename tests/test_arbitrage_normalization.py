@@ -32,8 +32,6 @@ from hypothesis import strategies as st
 
 from quant_engine.arbitrage.costs import (
     ArbitrageCostModel,
-    NetArbitrageResult,
-    NetCrossVenueResult,
     evaluate_arbitrage_costs,
     evaluate_cross_venue_costs,
 )
@@ -55,7 +53,6 @@ from quant_engine.arbitrage.normalization import (
     OpportunityLeg,
     OpportunityType,
     RiskFlags,
-    _compute_opportunity_id,
     normalize_cross_venue,
     normalize_same_market,
 )

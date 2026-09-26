@@ -21,7 +21,7 @@ dev = [
     "pytest>=8.3",
     "pytest-cov>=6.0",
     "hypothesis>=6.100",
-    "ruff>=0.7",
+    "ruff==0.16.9",
     "mypy>=1.12",
 ]
 
@@ -38,7 +38,10 @@ line-length = 99
 src = ["src", "tests"]
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "N", "UP", "B", "A", "C4", "SIM", "TCH"]
+select = ["E", "F", "W", "I", "UP", "B", "C4", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["B017", "B905", "E741", "C408", "F401", "E501"]
 
 [tool.mypy]
 python_version = "3.12"

@@ -7,7 +7,6 @@ No live API calls. No network access required.
 from __future__ import annotations
 
 import json
-import math
 import urllib.error
 import urllib.request
 from datetime import UTC, datetime
@@ -18,7 +17,6 @@ import pytest
 
 from quant_engine.market_data import (
     Dataset,
-    InvalidTimestampError,
     MarketQuote,
 )
 from quant_engine.market_data.errors import NormalizationError
@@ -41,7 +39,6 @@ from quant_engine.providers.polymarket.models import (
     PriceResponse,
     SpreadResponse,
 )
-
 
 # ══════════════════════════════════════════════════════════════════════════════
 # FIXTURES
@@ -809,7 +806,6 @@ class TestPolymarketNormalizer:
 
     def test_empty_token_id_raises_normalization_error(self) -> None:
         """Empty token_id must be rejected."""
-        from quant_engine.market_data.errors import NormalizationError
 
         normalizer = self._make_normalizer()
         book = OrderBookSummary(
@@ -829,7 +825,6 @@ class TestPolymarketNormalizer:
 
     def test_whitespace_token_id_raises_normalization_error(self) -> None:
         """Whitespace-only token_id must be rejected."""
-        from quant_engine.market_data.errors import NormalizationError
 
         normalizer = self._make_normalizer()
         book = OrderBookSummary(
@@ -881,7 +876,6 @@ class TestPolymarketNormalizer:
 
     def test_normalize_rejects_invalid_raw_dict(self) -> None:
         """normalize() raises NormalizationError for malformed dicts."""
-        from quant_engine.market_data.errors import NormalizationError
 
         normalizer = self._make_normalizer()
         with pytest.raises(NormalizationError, match="Failed to parse"):
@@ -889,7 +883,6 @@ class TestPolymarketNormalizer:
 
     def test_normalize_rejects_invalid_timestamp(self) -> None:
         """normalize() raises NormalizationError for unparseable timestamps."""
-        from quant_engine.market_data.errors import NormalizationError
 
         normalizer = self._make_normalizer()
         raw = dict(SAMPLE_ORDER_BOOK_RAW)

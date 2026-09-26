@@ -36,7 +36,7 @@ def main() -> None:
     returns = rng.normal(loc=0.0005, scale=0.01, size=252)
 
     print(f"Synthetic return series: {len(returns)} observations")
-    print(f"  Generated with seed=42, N(0.0005, 0.01)")
+    print("  Generated with seed=42, N(0.0005, 0.01)")
     print()
 
     # Descriptive statistics

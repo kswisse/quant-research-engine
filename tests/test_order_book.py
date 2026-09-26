@@ -36,7 +36,6 @@ from quant_engine.order_book import (
     validate_snapshot,
 )
 
-
 # ══════════════════════════════════════════════════════════════════════════════
 # HELPERS
 # ══════════════════════════════════════════════════════════════════════════════
@@ -527,7 +526,6 @@ class TestValidation:
 
     def test_empty_schema_version_rejected(self) -> None:
         """Empty schema_version fails validation."""
-        snap = _make_snapshot()
         snap2 = OrderBookSnapshot(
             provider="test",
             provider_instrument_id="T-1",
