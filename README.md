@@ -1,5 +1,8 @@
 # Quant Research Engine
 
+[![CI](https://github.com/kswisse/quant-research-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/kswisse/quant-research-engine/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 A quantitative research platform for backtest overfitting detection, prediction market analysis, options analytics, and information diffusion modeling.
 
 ## Status
