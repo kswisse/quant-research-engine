@@ -60,6 +60,7 @@ class SeedableRNG:
         return self._rng.integers(low=low, high=high, size=size)
 
     def choice(self, a: int | list[int], size: int | None = 1, replace: bool = True) -> np.ndarray:
+        # numpy returns a scalar when size=None, an ndarray otherwise
         return self._rng.choice(a, size=size, replace=replace)  # type: ignore[return-value]
 
     def permutation(self, x: int | np.ndarray) -> np.ndarray:
