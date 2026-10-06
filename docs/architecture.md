@@ -11,9 +11,17 @@ The Quant Research Engine is a modular monolith for quantitative research. It su
 
 ## Current Phase
 
-Phase 0: Foundation + Backtest Overfitting Detector (System D)
+Phase 0 (Foundation) is complete; shipped work runs through Phase 2.6 (arbitrage
+normalization, `src/quant_engine/arbitrage/normalization.py`).
 
-Systems A, B, and C will be implemented in future phases.
+- **System D — Backtest Overfitting Detector:** shipped — statistics, backtest engine,
+  strategy generator, experiment runner, overfitting analysis, and the research study
+  (`docs/overfitting.md`, `docs/research/overfitting-study.md`).
+- **System A — Prediction Market Mispricing Engine:** in progress — market data contract
+  (Phase 1.0), Polymarket/Kalshi adapters (1.1/1.3), dataset persistence and replay (1.2),
+  order book and execution simulator (2.1), arbitrage detection (2.2), cost model (2.3),
+  cross-venue detection (2.4), market identity (2.5), and normalization (2.6) are on `master`.
+- **Systems B (Hawkes) and C (Breeden–Litzenberger):** not started.
 
 ## Architecture: Modular Monolith
 
